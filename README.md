@@ -4,6 +4,10 @@
 
 The project focuses on reliable profile management, TUN networking, DNS/routing integration, engine lifecycle control, recovery behavior, and careful evaluation of new protocols and transports before they are promoted to stable builds.
 
+> **Independent project notice**
+>
+> GeniaProxy is an independent project and is not affiliated with, sponsored by, or endorsed by SagerNet, the sing-box project, XTLS, or the Xray-core project. Third-party names and trademarks are used only to identify compatibility with their respective software.
+
 > **Project status**
 >
 > - **4.4.x** — stable baseline
