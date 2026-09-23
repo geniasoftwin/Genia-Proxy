@@ -31,6 +31,19 @@ $textExtensions = @(
     ".xml", ".config", ".md", ".txt", ".env", ".example"
 )
 
+$knownPublicInfrastructureIPv4 = @(
+    "1.1.1.1",
+    "1.0.0.1",
+    "8.8.8.8"
+)
+
+$knownPublicProbeHosts = @(
+    "www.cloudflare.com",
+    "www.microsoft.com",
+    "www.gstatic.com",
+    "myip.opendns.com"
+)
+
 $findings = New-Object 'System.Collections.Generic.List[object]'
 
 function Add-Finding {
@@ -90,7 +103,43 @@ function Test-ExcludedPath {
 function Test-PlaceholderValue {
     param([string]$Line)
 
-    return $Line -match '(?i)(example|placeholder|redacted|changeme|replace[_ -]?me|your[_ -]?|<[^>]+>|REDACTED)'
+    if ($Line -match '(?i)(example|placeholder|redacted|changeme|replace[_ -]?me|your[_ -]?|dummy|test-only|<[^>]+>|REDACTED)') {
+        return $true
+    }
+
+    # Common low-entropy fixture values used only in tests/examples.
+    return $Line -match '(?i)["'']secret["'']'
+}
+
+function Test-VersionLikeContext {
+    param([string]$Line)
+
+    return $Line -match '(?i)(version|fileversion|assemblyversion|manifest\s+build|switchermanifestversion)'
+}
+
+function Test-SafeProxyUriLine {
+    param(
+        [string]$Uri,
+        [string]$Line
+    )
+
+    if (Test-PlaceholderValue $Line) { return $true }
+
+    if ($Line -match '(?i)(127\.0\.0\.1|198\.51\.100\.|203\.0\.113\.|192\.0\.2\.)') {
+        return $true
+    }
+
+    # Source-code interpolation constructs a URI at runtime but does not embed a credential.
+    if ($Line -match '[{}]') { return $true }
+
+    # Bare scheme mentions in docs/UI text are not access credentials.
+    if (($Uri -notmatch '@') -and
+        ($Uri -notmatch '(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}') -and
+        ($Uri -notmatch '(?i)^ss://[A-Za-z0-9+/_=-]{20,}')) {
+        return $true
+    }
+
+    return $false
 }
 
 function Test-PublicIPv4 {
@@ -123,6 +172,9 @@ function Test-PublicIPv4 {
     if ($a -eq 192 -and $b -eq 0 -and $c -eq 2) { return $false }
     if ($a -eq 198 -and $b -eq 51 -and $c -eq 100) { return $false }
     if ($a -eq 203 -and $b -eq 0 -and $c -eq 113) { return $false }
+
+    # Intentional public recursive DNS services used by the product/test suite.
+    if ($knownPublicInfrastructureIPv4 -contains $Address) { return $false }
 
     return $true
 }
@@ -164,16 +216,23 @@ foreach ($file in $files) {
                 Add-Finding -File $relative -Line $lineNumber -Rule "Embedded private key"
             }
 
-            if ($line -match '(?i)\b(vless|hysteria2?|hy2|trojan|tuic|ss|socks5?)://[^\s''"]+') {
-                if (-not (Test-PlaceholderValue $line)) {
-                    Add-Finding -File $relative -Line $lineNumber -Rule "Proxy/access URI"
-                }
+            $uriMatch = [regex]::Match(
+                $line,
+                '(?i)\b(vless|hysteria2?|hy2|trojan|tuic|ss|socks5?)://[^\s''"]+'
+            )
+            if ($uriMatch.Success -and
+                (-not (Test-SafeProxyUriLine -Uri $uriMatch.Value -Line $line))) {
+                Add-Finding -File $relative -Line $lineNumber -Rule "Proxy/access URI"
             }
 
-            if ($line -match '(?i)\b(password|passwd|token|api[_-]?key|secret|private[_-]?key|privateKey)\b\s*["'']?\s*[:=]\s*["'']?\s*[^\s"'']{6,}') {
-                if (-not (Test-PlaceholderValue $line)) {
-                    Add-Finding -File $relative -Line $lineNumber -Rule "Credential or private-key assignment"
-                }
+            # Flag only literal credential assignments. Variable-to-variable assignments such as
+            # CancellationToken token = request.Token are not secrets.
+            $credentialMatch = [regex]::Match(
+                $line,
+                '(?i)\b(password|passwd|token|api[_-]?key|secret|private[_-]?key|privateKey)\b\s*["'']?\s*[:=]\s*["'']([^"'']{6,})["'']'
+            )
+            if ($credentialMatch.Success -and (-not (Test-PlaceholderValue $line))) {
+                Add-Finding -File $relative -Line $lineNumber -Rule "Credential or private-key assignment"
             }
 
             if ($line -match '(?i)\b(uuid|user[_-]?id|client[_-]?id)\b\s*["'']?\s*[:=]\s*["'']?\s*[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}') {
@@ -182,15 +241,60 @@ foreach ($file in $files) {
                 }
             }
 
-            if ($line -match '(?i)\b(server|address|endpoint|host|sni)\b\s*["'']?\s*[:=]\s*["'']?\s*([a-z0-9][a-z0-9.-]+\.[a-z]{2,})') {
-                if (($line -notmatch '(?i)(example\.(com|org|net)|example\.invalid|localhost)') -and
-                    (-not (Test-PlaceholderValue $line))) {
+            # Only literal endpoint assignments are relevant. Expressions such as
+            # endpoint = Inspect(source) or server = uri.Host are not embedded infrastructure.
+            $hostMatch = [regex]::Match(
+                $line,
+                '(?i)\b(server|address|endpoint|host|sni)\b\s*["'']?\s*[:=]\s*["'']([a-z0-9][a-z0-9.-]+\.[a-z]{2,})["'']'
+            )
+            if ($hostMatch.Success) {
+                $hostValue = $hostMatch.Groups[2].Value.ToLowerInvariant()
+                $isKnownHost =
+                    ($knownPublicProbeHosts -contains $hostValue) -or
+                    ($hostValue -match '(^|\.)example\.(com|org|net)
+        }
+    }
+    catch {
+        Add-Finding -File $relative -Line "-" -Rule "Could not safely inspect text file"
+    }
+}
+
+$findings = $findings |
+    Sort-Object File, Line, Rule -Unique
+
+if (@($findings).Count -gt 0) {
+    Write-Host "PRECHECK FAILED: review the following locations before any public push." -ForegroundColor Red
+    $findings | Format-Table -AutoSize
+    Write-Host ""
+    Write-Host "Replace real values with explicit placeholders, then rerun this script."
+    exit 1
+}
+
+Write-Host "PRECHECK PASSED: no configured high-risk patterns were found." -ForegroundColor Green
+Write-Host "This is a safety net, not a substitute for manual review."
+exit 0
+) -or
+                    ($hostValue -eq 'example.invalid') -or
+                    ($hostValue -eq 'localhost')
+
+                if ((-not $isKnownHost) -and (-not (Test-PlaceholderValue $line))) {
                     Add-Finding -File $relative -Line $lineNumber -Rule "Potential production hostname/endpoint"
                 }
             }
 
             foreach ($match in [regex]::Matches($line, '(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)')) {
-                if (Test-PublicIPv4 $match.Value) {
+                $address = $match.Value
+
+                # Do not mistake product/assembly/manifest version numbers for IPv4.
+                if (Test-VersionLikeContext $line) { continue }
+
+                # These two prefixes intentionally split the IPv4 default route in half.
+                if (($address -eq '0.0.0.0' -or $address -eq '128.0.0.0') -and
+                    ($line -match ([regex]::Escape($address) + '/1'))) {
+                    continue
+                }
+
+                if (Test-PublicIPv4 $address) {
                     Add-Finding -File $relative -Line $lineNumber -Rule "Public IPv4 address"
                 }
             }
