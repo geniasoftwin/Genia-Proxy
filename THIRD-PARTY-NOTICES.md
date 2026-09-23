@@ -2,7 +2,7 @@
 
 ## sing-box 1.14.0
 
-GeniaProxy 4.3.3 RC2 использует официальный `sing-box.exe` как отдельное внешнее ядро процесса.
+GeniaProxy 4.4.0 использует официальный `sing-box.exe` как отдельное внешнее ядро процесса.
 
 - проект: https://github.com/SagerNet/sing-box
 - релиз: https://github.com/SagerNet/sing-box/releases/tag/v1.14.0
@@ -12,7 +12,7 @@ GeniaProxy 4.3.3 RC2 использует официальный `sing-box.exe` 
 
 ## Xray-core 26.3.27
 
-GeniaProxy поставляет официальный `xray.exe` для поддержки VLESS, XHTTP и
+GeniaProxy использует официальный `xray.exe` для поддержки VLESS, XHTTP и
 других профилей формата Xray.
 
 - проект: https://github.com/XTLS/Xray-core
@@ -20,12 +20,14 @@ GeniaProxy поставляет официальный `xray.exe` для под�
 - лицензия: Mozilla Public License 2.0
 - полный текст: `engine\XRAY-LICENSE.txt`
 
-## Wintun
+## Wintun 0.14.1
 
-`wintun.dll` поставляется в официальном архиве Xray-core и используется
-только для TUN-режима.
+`wintun.dll` используется для TUN-режима. Для воспроизводимой сборки
+`Prepare-Engines.ps1` загружает официальный архив Wintun 0.14.1 напрямую
+с wintun.net и проверяет SHA-256 архива и amd64 DLL перед установкой.
 
 - проект: https://www.wintun.net/
+- версия: 0.14.1
 - лицензия: WireGuard LLC General Business License
 - полный текст: `engine\WINTUN-LICENSE.txt`
 
