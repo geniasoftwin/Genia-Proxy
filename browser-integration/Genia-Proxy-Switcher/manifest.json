@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Genia Proxy Switcher Direct",
+  "version": "5.6.0.6",
+  "description": "Privacy-focused SOCKS5/TUN switcher with independent Direct Bridge/TUN lanes and a kill-switch-safe loopback bridge bootstrap and fail-closed TUN session fencing.",
+  "permissions": [
+    "proxy",
+    "storage",
+    "alarms",
+    "notifications",
+    "privacy",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "https://1.1.1.1/*",
+    "https://www.gstatic.com/*",
+    "http://127.0.0.1:47831/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Genia Proxy Switcher",
+    "default_icon": {
+      "16": "off.png",
+      "32": "off.png",
+      "48": "off.png",
+      "128": "off.png"
+    }
+  },
+  "icons": {
+    "16": "off.png",
+    "32": "off.png",
+    "48": "off.png",
+    "128": "off.png"
+  },
+  "version_name": "5.6.0 Stable Direct Bridge"
+}

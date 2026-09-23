@@ -1,0 +1,40 @@
+GeniaProxy 4.2.1 HF4 Security
+2026-08-15
+
+Scope: minimal security hotfix over 4.2.1 Final Stable.
+Application version remains 4.2.1 / file version 4.2.1.0.
+
+FIXES
+- TUN IPv6 fail-closed preflight now applies to both sing-box and Xray.
+- Xray TUN crash-recovery snapshot is strictly validated before any elevated
+  rollback action. Only the exact route/DNS topology GeniaProxy 4.2.1 can
+  create is accepted.
+- PowerShell route rollback now escapes single-quoted values and matches the
+  saved NextHop in addition to destination prefix and interface index.
+- Xray profiles containing pinnedPeerCertSha256 are rejected fail-closed in
+  4.2.1 HF4 while bundled Xray 26.3.27 is used.
+- Core update and rollback are blocked while GeniaProxy is running elevated;
+  perform core maintenance in USER mode.
+- Profile endpoint DNS resolution now forwards the cancellation token directly
+  to Dns.GetHostAddressesAsync.
+
+REGRESSION COVERAGE
+- Xray pinnedPeerCertSha256 rejection.
+- Valid TUN snapshot acceptance.
+- Malicious DestinationPrefix rejection.
+- Foreign/tampered TUN NextHop rejection.
+
+UNCHANGED BY DESIGN
+- XHTTP/XMUX parameters and runtime topology.
+- Xray route plan (endpoint /32 + 0.0.0.0/1 + 128.0.0.0/1).
+- DNS values and rollback ordering.
+- sing-box generated TUN configuration.
+- QR/share format.
+- bundled xray.exe, sing-box.exe and wintun.dll binaries.
+- application UI palette/geometry and branding.
+
+IMPORTANT
+HF4 does not redesign the portable trust model. A portable directory writable
+by an untrusted local process remains a broader architectural trust boundary.
+A signed release manifest / protected install location / elevated broker is a
+future hardening item, not part of this surgical hotfix.

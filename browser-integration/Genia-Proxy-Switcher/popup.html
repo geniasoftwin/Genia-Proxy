@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Genia Proxy Switcher 5.5</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-synthesis: none;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      width: 382px;
+      min-height: 640px;
+      margin: 0;
+      background:
+        radial-gradient(circle at 90% 0%, rgba(56, 189, 248, 0.14), transparent 38%),
+        #0b1120;
+      color: #e5eefc;
+    }
+
+    button, input, select { font: inherit; }
+    button, select { -webkit-tap-highlight-color: transparent; }
+    .app { padding: 18px; }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 15px;
+    }
+
+    .app-icon {
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      border-radius: 11px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+    }
+
+    h1 {
+      margin: 0;
+      color: #f8fafc;
+      font-size: 16px;
+      font-weight: 760;
+      letter-spacing: -0.01em;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: #8291aa;
+      font-size: 11px;
+    }
+
+    .status-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 112px;
+      padding: 16px;
+      border: 1px solid #26334a;
+      border-radius: 14px;
+      background: rgba(20, 30, 51, 0.84);
+      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.2);
+    }
+
+    .status-card::after {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 2px;
+      background: #64748b;
+      content: "";
+    }
+
+    .status-card[data-status="verified"]::after { background: #22c55e; }
+    .status-card[data-status="checking"]::after,
+    .status-card[data-status="degraded"]::after { background: #f59e0b; }
+    .status-card[data-status="wrong_exit"]::after,
+    .status-card[data-status="unreachable"]::after,
+    .status-card[data-status="blocked"]::after,
+    .status-card[data-status="error"]::after { background: #fb7185; }
+
+    .status-line { display: flex; align-items: center; gap: 8px; }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      flex: 0 0 9px;
+      border-radius: 50%;
+      background: #64748b;
+      box-shadow: 0 0 0 4px rgba(100, 116, 139, 0.14);
+    }
+
+    [data-status="verified"] .status-dot {
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.13);
+    }
+
+    [data-status="checking"] .status-dot,
+    [data-status="degraded"] .status-dot {
+      background: #f59e0b;
+      box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.13);
+    }
+
+    [data-status="checking"] .status-dot { animation: pulse 1.15s ease-in-out infinite; }
+
+    [data-status="wrong_exit"] .status-dot,
+    [data-status="unreachable"] .status-dot,
+    [data-status="blocked"] .status-dot,
+    [data-status="error"] .status-dot {
+      background: #fb7185;
+      box-shadow: 0 0 0 4px rgba(251, 113, 133, 0.13);
+    }
+
+    @keyframes pulse { 50% { opacity: 0.45; transform: scale(0.76); } }
+    @media (prefers-reduced-motion: reduce) { .status-dot { animation: none !important; } }
+
+    .status-title { color: #f8fafc; font-size: 14px; font-weight: 730; }
+
+    .status-detail {
+      min-height: 34px;
+      margin: 10px 0 0 17px;
+      color: #a8b5ca;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .route-info, .last-check {
+      margin: 7px 0 0 17px;
+      color: #8fa2be;
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .last-check { color: #687891; }
+
+    .shield-card {
+      margin-top: 12px;
+      padding: 13px 14px;
+      border: 1px solid #28405a;
+      border-radius: 12px;
+      background: rgba(10, 26, 43, 0.78);
+    }
+
+    .shield-card[data-shield="protected"] { border-color: rgba(34, 197, 94, 0.45); }
+    .shield-card[data-shield="compatibility"] { border-color: rgba(245, 158, 11, 0.5); }
+    .shield-card[data-shield="compromised"] { border-color: rgba(251, 113, 133, 0.55); }
+
+    .shield-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .shield-name { color: #dbeafe; font-size: 11.5px; font-weight: 760; }
+    .shield-badge {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 8.5px;
+      font-weight: 800;
+      letter-spacing: .04em;
+    }
+    [data-shield="protected"] .shield-badge { background: rgba(22, 101, 52, .35); color: #86efac; }
+    [data-shield="compatibility"] .shield-badge { background: rgba(146, 64, 14, .35); color: #fcd34d; }
+    [data-shield="compromised"] .shield-badge { background: rgba(136, 19, 55, .35); color: #fda4af; }
+
+    .shield-detail { margin: 7px 0 0; color: #8394ad; font-size: 9.5px; line-height: 1.45; }
+    .shield-actions { display: flex; gap: 8px; margin-top: 9px; }
+    .self-test-button {
+      min-height: 31px;
+      padding: 0 10px;
+      border-color: #31506d;
+      background: #12283d;
+      color: #b9dcf7;
+      font-size: 9.5px;
+    }
+    .self-test-result { align-self: center; color: #71819a; font-size: 9px; line-height: 1.3; }
+
+    .settings { margin-top: 15px; }
+
+    label, .field-label {
+      display: block;
+      margin-bottom: 7px;
+      color: #93a4bc;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .field { margin-top: 11px; }
+
+    select, input[type="number"], input[type="text"] {
+      width: 100%;
+      height: 42px;
+      border: 1px solid #31415c;
+      border-radius: 10px;
+      outline: none;
+      background: #111c30;
+      color: #edf4ff;
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+    }
+
+    select { padding: 0 36px 0 12px; }
+    input[type="number"], input[type="text"] { padding: 0 12px; }
+
+    select:focus-visible, input:focus-visible, button:focus-visible, summary:focus-visible {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.17);
+    }
+
+    .custom-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      margin-top: 9px;
+    }
+
+    .custom-row[hidden] { display: none; }
+
+    .hint {
+      margin: 6px 1px 0;
+      color: #687891;
+      font-size: 9.5px;
+      line-height: 1.4;
+    }
+
+    .switch-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-top: 12px;
+      padding: 10px 11px;
+      border: 1px solid #283852;
+      border-radius: 10px;
+      background: rgba(17, 28, 48, 0.72);
+    }
+
+    .switch-row input {
+      width: 16px;
+      height: 16px;
+      margin: 1px 0 0;
+      accent-color: #38bdf8;
+    }
+
+    .switch-title { color: #dbeafe; font-size: 11px; font-weight: 680; }
+    .switch-detail { margin-top: 2px; color: #71819a; font-size: 9.5px; line-height: 1.4; }
+
+    button {
+      min-height: 42px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      cursor: pointer;
+      color: #fff;
+      font-weight: 720;
+      transition: filter 120ms ease, transform 80ms ease, opacity 120ms ease;
+    }
+
+    button:hover:not(:disabled) { filter: brightness(1.07); }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:disabled, select:disabled, input:disabled { cursor: not-allowed; opacity: 0.58; }
+
+    .apply-button {
+      padding: 0 13px;
+      border-color: #3a4b67;
+      background: #1d2a41;
+      font-size: 11px;
+    }
+
+    .apply-settings {
+      width: 100%;
+      min-height: 36px;
+      margin-top: 10px;
+      border-color: #32425c;
+      background: #17233a;
+      color: #c8d6e8;
+      font-size: 10.5px;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .toggle-button {
+      padding: 0 16px;
+      background: linear-gradient(135deg, #0ea5e9, #2563eb);
+      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.18);
+    }
+
+    .toggle-button.is-enabled {
+      background: linear-gradient(135deg, #e11d48, #be123c);
+      box-shadow: 0 10px 25px rgba(190, 18, 60, 0.17);
+    }
+
+    .check-button {
+      width: 44px;
+      padding: 0;
+      border-color: #32425c;
+      background: #17233a;
+      color: #b9c7d9;
+      font-size: 18px;
+    }
+
+    .check-button span { display: block; transform: translateY(-1px); }
+
+    .error {
+      margin-top: 11px;
+      padding: 9px 11px;
+      border: 1px solid rgba(251, 113, 133, 0.32);
+      border-radius: 9px;
+      background: rgba(136, 19, 55, 0.22);
+      color: #fecdd3;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .error[hidden] { display: none; }
+
+    details {
+      margin-top: 13px;
+      border-top: 1px solid rgba(49, 65, 92, 0.72);
+      padding-top: 10px;
+    }
+
+    summary {
+      cursor: pointer;
+      color: #8fa2be;
+      font-size: 10.5px;
+      font-weight: 650;
+      user-select: none;
+    }
+
+    .diag-grid {
+      display: grid;
+      grid-template-columns: 122px 1fr;
+      gap: 7px 10px;
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #26354d;
+      border-radius: 10px;
+      background: rgba(10, 17, 31, 0.55);
+      font-size: 9.5px;
+      line-height: 1.35;
+    }
+
+    .diag-key { color: #71819a; }
+    .diag-value { color: #c4d2e5; overflow-wrap: anywhere; }
+    .diag-good { color: #86efac; }
+    .diag-warn { color: #fcd34d; }
+    .diag-bad { color: #fda4af; }
+
+    .copy-button {
+      width: 100%;
+      min-height: 34px;
+      margin-top: 8px;
+      border-color: #2d3d57;
+      background: #121f34;
+      color: #9fb0c6;
+      font-size: 10px;
+    }
+
+    .log-list {
+      max-height: 176px;
+      overflow: auto;
+      margin-top: 9px;
+      padding: 8px 9px;
+      border: 1px solid #26354d;
+      border-radius: 10px;
+      background: rgba(10, 17, 31, 0.55);
+    }
+    .log-item { padding: 5px 0; border-bottom: 1px solid rgba(49,65,92,.45); color: #9fb0c6; font-size: 9px; line-height: 1.4; }
+    .log-item:last-child { border-bottom: 0; }
+    .log-time { color: #5f728e; margin-right: 6px; }
+    .log-empty { color: #64748b; font-size: 9px; }
+
+
+    .audit-card { margin-top: 13px; padding: 12px; border: 1px solid #29405a; border-radius: 11px; background: rgba(10,26,43,.68); }
+    .audit-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .audit-title { color:#dbeafe; font-size:11px; font-weight:760; }
+    .audit-score { color:#94a3b8; font-size:10px; font-weight:800; }
+    .audit-score.pass { color:#86efac; } .audit-score.warn { color:#fcd34d; } .audit-score.fail { color:#fda4af; }
+    .audit-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:9px; }
+    .audit-button { min-height:34px; padding:0 8px; border-color:#31506d; background:#12283d; color:#b9dcf7; font-size:9.5px; }
+    .audit-detail { margin-top:7px; color:#71819a; font-size:9px; line-height:1.4; }
+    .stats-list { margin-top:8px; color:#8fa2be; font-size:9px; line-height:1.5; white-space:pre-line; }
+
+    .security-note {
+      display: flex;
+      gap: 8px;
+      margin-top: 13px;
+      color: #71819a;
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    .lock { flex: 0 0 auto; color: #38bdf8; font-size: 12px; }
+
+    .manager-card { margin: 12px 0; padding: 12px; border: 1px solid #155e75; border-radius: 12px; background: linear-gradient(180deg, rgba(8,47,73,.72), rgba(2,24,39,.84)); }
+    .manager-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; }
+    .manager-title { font-weight:800; color:#67e8f9; letter-spacing:.02em; }
+    .manager-badge { padding:3px 8px; border-radius:999px; font-size:11px; font-weight:800; background:#172554; color:#93c5fd; }
+    .manager-badge.connected { background:rgba(6,78,59,.75); color:#86efac; }
+    .manager-badge.warn { background:rgba(120,53,15,.72); color:#fde68a; }
+    .manager-badge.off { background:rgba(51,65,85,.72); color:#cbd5e1; }
+    .manager-grid { display:grid; grid-template-columns: 104px 1fr; gap:5px 9px; font-size:12px; }
+    .manager-key { color:#94a3b8; }
+    .manager-value { color:#e2e8f0; overflow-wrap:anywhere; }
+    .manager-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .manager-button { flex:1; min-width:120px; border:1px solid #0891b2; color:#a5f3fc; background:#083344; border-radius:8px; padding:8px 10px; cursor:pointer; font-weight:700; }
+    .manager-button.secondary { border-color:#475569; background:#0f172a; color:#cbd5e1; }
+    .manager-note { margin-top:8px; color:#94a3b8; font-size:11px; line-height:1.35; }
+    .route-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin:10px 0 4px; }
+    .route-node { min-width:0; border:1px solid #164e63; background:rgba(8,47,73,.42); border-radius:8px; padding:7px 5px; text-align:center; }
+    .route-node strong { display:block; color:#67e8f9; font-size:10px; letter-spacing:.04em; }
+    .route-node span { display:block; color:#e2e8f0; font-size:10px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <img class="app-icon" id="appIcon" src="off.png" alt="">
+      <div>
+        <h1>Genia Proxy Switcher</h1>
+        <p class="subtitle">SOCKS5 · Privacy Shield · Adaptive TUN Guard · Direct Bridge · v5.6.0 Stable</p>
+      </div>
+    </header>
+
+    <section class="status-card" id="statusCard" data-status="off" role="status" aria-live="polite" aria-atomic="true">
+      <div class="status-line">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="status-title" id="statusTitle">Выключен</span>
+      </div>
+      <p class="status-detail" id="statusDetail">Chrome использует системные настройки подключения.</p>
+      <p class="route-info" id="routeInfo"></p>
+      <p class="last-check" id="lastCheck">Проверок ещё не было</p>
+    </section>
+
+
+    <section class="manager-card" id="managerCard">
+      <div class="manager-head">
+        <span class="manager-title">GeniaProxy Direct Bridge</span>
+        <span class="manager-badge off" id="managerBadge">OFF</span>
+      </div>
+      <div class="route-strip" aria-label="Маршрут GeniaProxy">
+        <div class="route-node"><strong>MANAGER</strong><span id="routeManager">—</span></div>
+        <div class="route-node"><strong>SOCKS5</strong><span id="routeSocks">127.0.0.1:2080</span></div>
+        <div class="route-node"><strong>CHROME</strong><span id="routeChrome">OFF</span></div>
+        <div class="route-node"><strong>EXIT</strong><span id="routeExit">—</span></div>
+      </div>
+      <div class="manager-grid">
+        <span class="manager-key">Manager</span><span class="manager-value" id="managerStatusText">Bridge не подключён</span>
+        <span class="manager-key">Версия / ядро</span><span class="manager-value" id="managerVersionEngine">—</span>
+        <span class="manager-key">Профиль</span><span class="manager-value" id="managerProfile">—</span>
+        <span class="manager-key">Режим</span><span class="manager-value" id="managerMode">—</span>
+        <span class="manager-key">Local proxy</span><span class="manager-value" id="managerLocalProxy">—</span>
+        <span class="manager-key">Endpoint</span><span class="manager-value" id="managerEndpoint">—</span>
+        <span class="manager-key">Verified exit</span><span class="manager-value" id="managerVerifiedExit">—</span>
+        <span class="manager-key">Browser exit</span><span class="manager-value" id="managerObservedExit">—</span>
+        <span class="manager-key">TUN monitor</span><span class="manager-value" id="managerMonitorStatus">—</span>
+        <span class="manager-key">Route match</span><span class="manager-value" id="managerCoherence">—</span>
+      </div>
+      <div class="manager-actions">
+        <button class="manager-button" id="managerConnectButton" type="button">Подключить Direct Bridge</button>
+        <button class="manager-button secondary" id="managerRefreshButton" type="button">Проверить Direct Bridge</button>
+      </div>
+      <div class="manager-note" id="managerNote">Direct Loopback Bridge: расширение читает состояние GeniaProxy.exe через 127.0.0.1 без NativeHost.</div>
+    </section>
+
+<section class="shield-card" id="shieldCard" data-shield="off" aria-live="polite">
+      <div class="shield-head">
+        <span class="shield-name">🛡 WebRTC Shield · Live Guard</span>
+        <span class="shield-badge" id="shieldBadge">OFF</span>
+      </div>
+      <p class="shield-detail" id="shieldDetail">Включается автоматически вместе с защищённым маршрутом.</p>
+      <div class="shield-actions">
+        <button class="self-test-button" id="selfTestButton" type="button">WebRTC Shield Check</button>
+        <span class="self-test-result" id="selfTestResult">Проверка ещё не запускалась</span>
+      </div>
+      <p class="hint">ICE-кандидаты внутри chrome-extension:// показываются только как диагностика. Verdict защиты определяется policy, ownership и состоянием защищённого маршрута; это не замена внешнему website leak-test.</p>
+    </section>
+
+    <section class="settings" aria-label="Настройки прокси">
+      <label for="profileSelect">Профиль SOCKS5</label>
+      <select id="profileSelect">
+        <option value="2080" data-name="GeniaProxy / NekoBox / Hysteria / VLESS">GeniaProxy · NekoBox · VLESS — 2080</option>
+        <option value="1080" data-name="SSH Tunnel">SSH Tunnel — 1080</option>
+        <option value="2081" data-name="Local proxy alt">Локальный прокси — 2081</option>
+        <option value="custom" data-name="Свой порт">Свой порт…</option>
+      </select>
+
+      <div class="custom-row" id="customRow" hidden>
+        <input id="customPort" type="number" min="1" max="65535" step="1" value="2080" inputmode="numeric" autocomplete="off" aria-label="Порт локального SOCKS5-прокси">
+        <button class="apply-button" id="applyPortButton" type="button">ОК</button>
+      </div>
+
+      <div class="field">
+        <label for="expectedIp">Trusted Exit IPs</label>
+        <input id="expectedIp" type="text" maxlength="220" autocomplete="off" spellcheck="false" placeholder="198.51.100.10, 203.0.113.10">
+        <p class="hint">Разрешённые выходные IPv4/IPv6 через запятую. VERIFIED только если Cloudflare видит один из них; любой третий IP → WRONG EXIT + Kill Switch.</p>
+      </div>
+
+      <label class="switch-row" for="strictLocal">
+        <input id="strictLocal" type="checkbox" checked>
+        <span>
+          <span class="switch-title">Strict local routing</span>
+          <span class="switch-detail">Простые имена и link-local IP идут через SOCKS5. Явный loopback остаётся локальным.</span>
+        </span>
+      </label>
+
+      <label class="switch-row" for="webRtcShield">
+        <input id="webRtcShield" type="checkbox" checked>
+        <span>
+          <span class="switch-title">WebRTC Shield · автоматически</span>
+          <span class="switch-detail">По умолчанию Chrome получает максимальную политику disable_non_proxied_udp и Live Guard следит за ней.</span>
+        </span>
+      </label>
+
+      <label class="switch-row" for="webRtcCompatibility">
+        <input id="webRtcCompatibility" type="checkbox">
+        <span>
+          <span class="switch-title">Compatibility Mode</span>
+          <span class="switch-detail">Только если видеочат не работает. Использует default_public_interface_only — это слабее Maximum protection.</span>
+        </span>
+      </label>
+
+      <label class="switch-row" for="hardKillSwitch">
+        <input id="hardKillSwitch" type="checkbox" checked>
+        <span>
+          <span class="switch-title">Hard Kill Switch</span>
+          <span class="switch-detail">Fail-closed: при включении держит web-трафик заблокированным до VERIFIED; снова блокирует при DEGRADED, WRONG EXIT, недоступном SOCKS5 или перехвате настроек.</span>
+        </span>
+      </label>
+
+      <button class="apply-settings" id="applySettingsButton" type="button">Применить настройки</button>
+    </section>
+
+    <div class="actions">
+      <button class="toggle-button" id="toggleButton" type="button" aria-pressed="false">Включить прокси</button>
+      <button class="check-button" id="checkButton" type="button" title="Проверить маршрут" aria-label="Проверить маршрут"><span aria-hidden="true">↻</span></button>
+    </div>
+
+    <div class="error" id="errorBox" role="alert" hidden></div>
+
+    <section class="audit-card" aria-label="Daily Security Audit">
+      <div class="audit-head">
+        <span class="audit-title">Stability & Daily Audit</span>
+        <span class="audit-score" id="auditScore">не запускался</span>
+      </div>
+      <div class="audit-actions">
+        <button class="audit-button" id="dailyAuditButton" type="button">Полная проверка</button>
+        <button class="audit-button" id="trustedExitTestButton" type="button">Тест Trusted Exits</button>
+      </div>
+      <div class="audit-detail" id="trustedExitTestStatus">Trusted Exit Test не запущен.</div>
+      <div class="stats-list" id="routeStats">Статистика появится после проверок.</div>
+      <div class="audit-detail" id="auditHistoryText">История Daily Audit пока пуста.</div>
+    </section>
+
+    <details id="diagnostics">
+      <summary>Диагностика маршрута</summary>
+      <div class="diag-grid">
+        <span class="diag-key">SOCKS5</span><span class="diag-value" id="diagEndpoint">—</span>
+        <span class="diag-key">Proxy control</span><span class="diag-value" id="diagProxyControl">—</span>
+        <span class="diag-key">Конфигурация</span><span class="diag-value" id="diagProxyConfig">—</span>
+        <span class="diag-key">WebRTC</span><span class="diag-value" id="diagWebRtc">—</span>
+        <span class="diag-key">WebRTC control</span><span class="diag-value" id="diagWebRtcControl">—</span>
+        <span class="diag-key">Prediction</span><span class="diag-value" id="diagPrediction">—</span>
+        <span class="diag-key">Live Guard</span><span class="diag-value" id="diagLiveGuard">—</span>
+        <span class="diag-key">Kill Switch</span><span class="diag-value" id="diagKillSwitch">—</span>
+        <span class="diag-key">Local routing</span><span class="diag-value" id="diagStrictLocal">—</span>
+        <span class="diag-key">Observed IP</span><span class="diag-value" id="diagExitIp">—</span>
+        <span class="diag-key">Trusted exits</span><span class="diag-value" id="diagExpectedIp">—</span>
+        <span class="diag-key">Источник</span><span class="diag-value" id="diagSource">—</span>
+        <span class="diag-key">Latency</span><span class="diag-value" id="diagLatency">—</span>
+        <span class="diag-key">Cloudflare</span><span class="diag-value" id="diagCloudflare">—</span>
+        <span class="diag-key">Failures</span><span class="diag-value" id="diagFailures">0</span>
+        <span class="diag-key">WebRTC Check</span><span class="diag-value" id="diagSelfTest">—</span>
+        <span class="diag-key">Browser TZ</span><span class="diag-value" id="diagBrowserTz">—</span>
+        <span class="diag-key">TZ fingerprint</span><span class="diag-value" id="diagTimezoneMatch">—</span>
+        <span class="diag-key">Direct Bridge</span><span class="diag-value" id="diagManager">—</span>
+        <span class="diag-key">Manager route</span><span class="diag-value" id="diagManagerRoute">—</span>
+        <span class="diag-key">Proxy error</span><span class="diag-value" id="diagProxyError">—</span>
+        <span class="diag-key">Daily Audit</span><span class="diag-value" id="diagAudit">—</span>
+        <span class="diag-key">Health cadence</span><span class="diag-value" id="diagCadence">—</span>
+      </div>
+      <button class="copy-button" id="copyDiagnosticsButton" type="button">Копировать диагностику</button>
+    </details>
+
+    <details id="eventLogDetails">
+      <summary>Security Event Log</summary>
+      <div class="log-list" id="eventLogList"><div class="log-empty">Событий пока нет.</div></div>
+      <button class="copy-button" id="clearLogButton" type="button">Очистить журнал</button>
+    </details>
+
+    <div class="security-note">
+      <span class="lock" aria-hidden="true">◆</span>
+      <span>Maximum WebRTC Shield включается автоматически. Hard Kill Switch работает fail-closed до VERIFIED и блокирует браузерный web-трафик при опасном/неподтверждённом состоянии; это не системный firewall и не защита трафика других программ.</span>
+    </div>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

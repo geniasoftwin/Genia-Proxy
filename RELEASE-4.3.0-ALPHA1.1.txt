@@ -1,0 +1,23 @@
+GeniaProxy 4.3.0 Alpha 1.1 — UI Polish
+========================================
+
+Base:
+- GeniaProxy 4.3.0 Alpha 1.
+- 4.2.1 HF4 security baseline is preserved.
+- Network/TUN/DNS/rollback/engines/QR/privacy-probe logic is unchanged.
+
+UI polish in Alpha 1.1:
+- Protocol headline now focuses on user-facing transport facts (for example VLESS · XHTTP · TLS · XMUX) instead of internal Xray freedom/blackhole outbounds.
+- Core remains visible in the dedicated CORE telemetry card, so the protocol headline no longer repeats Xray/sing-box.
+- Mode telemetry uses LOCAL PROXY / SYSTEM PROXY / TUN consistently.
+- Server telemetry shows only the resolved endpoint value; the card title already says SERVER.
+- Exit telemetry shows only the verified exit IP, or NOT VERIFIED before the privacy probe.
+- TUN footer is state-aware: available / selected / active.
+- GUARD badge is state-aware: GUARD READY / GUARD TUN. The tooltip explicitly states that HF4 TUN guard is not a WFP Strict Kill Switch.
+- Live local route now starts at the PC and includes Internet for a complete visual chain.
+- Local-mode privacy log wording is fully Russian.
+- CA1822 analyzer warning removed by making EnsureMaintenanceRunsUnelevated static.
+
+Important:
+- This remains an Alpha development branch.
+- WFP Strict Kill Switch and privilege-separated broker are NOT implemented in Alpha 1.1.

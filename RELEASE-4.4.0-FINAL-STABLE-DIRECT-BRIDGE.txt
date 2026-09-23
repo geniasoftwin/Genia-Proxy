@@ -1,0 +1,14 @@
+GeniaProxy 4.4.0 Final Stable Direct Bridge
+===========================================
+
+Base: frozen GeniaProxy 4.3.3 network/TUN/Xray/recovery baseline.
+
+Final browser integration:
+- in-process read-only Direct Bridge on 127.0.0.1:47831/v1/status;
+- no GeniaProxy.NativeHost.exe and no Native Messaging registration;
+- Genia Proxy Switcher Direct 5.6.0 Stable (manifest build 5.6.0.6);
+- validated Local <-> TUN handoff, multi-profile queue isolation and fail-closed TUN fencing;
+- normal WPF shutdown APPCRASH fixed by deferred final Close();
+- deliberate fail-closed policy after Manager shutdown until manual Disable proxy.
+
+No intended change to the frozen 4.3.3 network/TUN/DNS/Xray algorithms.

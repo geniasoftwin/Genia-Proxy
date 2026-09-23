@@ -1,0 +1,22 @@
+GeniaProxy 4.2.1 Final Stable
+=============================
+
+Final stable revision based on the tested 4.2.1 HF3 candidate.
+
+Final UI-only polish:
+- USER / ADMIN privilege badge has a fixed minimum width and centered text,
+  preventing ADMIN from being visually clipped on Windows DPI/scaling variants.
+
+Frozen network core:
+- Xray and sing-box connection/session logic unchanged from tested HF3;
+- TUN routes, DNS readiness, rollback and connectivity probes unchanged;
+- IPv6 leak guard unchanged;
+- profile QR/share logic unchanged;
+- dynamic profile endpoint/exit-IP display unchanged;
+- fast USER -> ADMIN UAC handoff unchanged;
+- xray.exe, sing-box.exe and wintun.dll unchanged.
+
+Release status: FINAL STABLE
+Version: 4.2.1
+Platform: Windows x64
+Packaging: Portable / self-contained

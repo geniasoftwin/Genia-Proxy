@@ -1,0 +1,25 @@
+GeniaProxy 4.2.1 HF2 — Final UI / UAC Polish
+=============================================
+
+Основа: GeniaProxy 4.2.1 HF1 QR Hotfix.
+Сетевая архитектура и ядра не изменялись.
+
+Изменения HF2:
+- новая фирменная GP-иконка в текущей navy/cyan палитре;
+- USER / ADMIN индикатор в шапке;
+- при запуске TUN без elevation приложение предлагает перезапуск через UAC;
+- после согласия сохраняются выбранный профиль, ядро, TUN-режим и выполняется
+  автоматическое продолжение подключения в elevated-копии;
+- single-instance handoff ждёт корректного закрытия обычного процесса до 15 секунд;
+- отмена UAC не закрывает приложение и не меняет сеть;
+- сообщения запуска различают Local Proxy, System Proxy и TUN;
+- вторичные WinForms-диалоги используют иконку текущего EXE;
+- TextBox/ComboBox приведены к одинаковой минимальной высоте 32 px.
+
+Не изменялись:
+- sing-box/xray/wintun и их SHA256;
+- Xray/sing-box TUN networking;
+- DNS readiness, routes, rollback, crash/reconnect;
+- XHTTP/XMUX;
+- QR HF1 compact share links;
+- privacy/IPv6 leak guard 4.2.1.

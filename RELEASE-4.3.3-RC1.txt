@@ -1,0 +1,23 @@
+GeniaProxy 4.3.3 RC1
+====================
+
+Base: GeniaProxy 4.3.2 Final Stable LTS / REALITY Vision RAW FIX3.
+
+Maintenance scope:
+- sing-box 1.14.0 stable pin;
+- NativeHost Bridge v2 RC4 integration;
+- Genia Proxy Switcher 5.5.3 package integration;
+- portable managerRoot self-refresh;
+- Browser Integration integrity and install/uninstall controls;
+- no intended changes to the validated Windows TUN/DNS/Xray network orchestration.
+
+Pinned sing-box 1.14.0 SHA256:
+AAD0EDE010EAFA7B277E520464F3A66FDE820103D737EFF739F40F3CC9451DCC
+
+Bundled NativeHost Bridge v2 RC4 SHA256:
+53991084942C40250A583A0A992465F065D461E14041F184F032BE956BB1A7F7
+
+Bundled Switcher 5.5.3 ZIP SHA256:
+F9CFB2A966DB5E15FB2CE827BDB6A6E2D2355EF7D7343E4B85A6EC49BB63C3D3
+
+Status: RELEASE CANDIDATE. Promote only after Windows build/tests and end-to-end Browser Integration acceptance.

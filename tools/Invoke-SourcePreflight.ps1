@@ -12,7 +12,8 @@ $root = (Resolve-Path -LiteralPath $Path).Path
 $excludedDirectoryNames = @(
     ".git", ".vs", ".idea",
     "bin", "obj", "out", "output", "dist", "artifacts", "publish",
-    "packages", "TestResults", "coverage", "node_modules"
+    "packages", "TestResults", "coverage", "node_modules",
+    "logs", "runtime", "temp", "tmp"
 )
 
 $blockedExtensions = @(
@@ -31,7 +32,20 @@ $textExtensions = @(
     ".xml", ".config", ".md", ".txt", ".env", ".example"
 )
 
-$findings = [System.Collections.Generic.List[object]]::new()
+$knownPublicInfrastructureIPv4 = @(
+    "1.1.1.1",
+    "1.0.0.1",
+    "8.8.8.8"
+)
+
+$knownPublicProbeHosts = @(
+    "www.cloudflare.com",
+    "www.microsoft.com",
+    "www.gstatic.com",
+    "myip.opendns.com"
+)
+
+$findings = New-Object 'System.Collections.Generic.List[object]'
 
 function Add-Finding {
     param(
@@ -47,16 +61,32 @@ function Add-Finding {
     })
 }
 
-function Get-RelativePath {
+function Get-RelativePathCompat {
     param([string]$FullName)
 
-    return [System.IO.Path]::GetRelativePath($root, $FullName)
+    $resolved = [System.IO.Path]::GetFullPath($FullName)
+    $base = [System.IO.Path]::GetFullPath($root)
+    $separator = [string][System.IO.Path]::DirectorySeparatorChar
+
+    if ($resolved.Equals($base, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return "."
+    }
+
+    if (-not $base.EndsWith($separator)) {
+        $base += $separator
+    }
+
+    if ($resolved.StartsWith($base, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $resolved.Substring($base.Length)
+    }
+
+    return $resolved
 }
 
 function Test-ExcludedPath {
     param([string]$FullName)
 
-    $relative = Get-RelativePath $FullName
+    $relative = Get-RelativePathCompat $FullName
     $parts = $relative -split '[\\/]'
 
     foreach ($part in $parts) {
@@ -68,23 +98,46 @@ function Test-ExcludedPath {
     return $false
 }
 
-function Test-PlaceholderValue {
+function Test-PlaceholderLine {
     param([string]$Line)
 
-    return $Line -match '(?i)(example|placeholder|redacted|changeme|replace[_ -]?me|your[_ -]?|<[^>]+>|REDACTED)'
+    return $Line -match '(?i)(example|placeholder|redacted|changeme|replace[_ -]?me|your[_ -]?|dummy|test-only|<[^>]+>|REDACTED)'
+}
+
+function Test-VersionContext {
+    param([string]$Line)
+
+    return $Line -match '(?i)(version|fileversion|assemblyversion|manifestversion|switchermanifestversion|manifest\s+build)'
 }
 
 function Test-PublicIPv4 {
     param([string]$Address)
 
+    if ($knownPublicInfrastructureIPv4 -contains $Address) {
+        return $false
+    }
+
+    # Route prefix used for split-default routing, not a server endpoint.
+    if ($Address -eq "128.0.0.0") {
+        return $false
+    }
+
     $parts = $Address.Split('.')
-    if ($parts.Count -ne 4) { return $false }
+    if ($parts.Count -ne 4) {
+        return $false
+    }
 
     $octets = @()
     foreach ($part in $parts) {
         $value = 0
-        if (-not [int]::TryParse($part, [ref]$value)) { return $false }
-        if ($value -lt 0 -or $value -gt 255) { return $false }
+        if (-not [int]::TryParse($part, [ref]$value)) {
+            return $false
+        }
+
+        if ($value -lt 0 -or $value -gt 255) {
+            return $false
+        }
+
         $octets += $value
     }
 
@@ -99,7 +152,7 @@ function Test-PublicIPv4 {
     if ($a -eq 192 -and $b -eq 168) { return $false }
     if ($a -eq 100 -and $b -ge 64 -and $b -le 127) { return $false }
 
-    # Benchmark/test/documentation ranges.
+    # Benchmark and documentation-only ranges.
     if ($a -eq 198 -and ($b -eq 18 -or $b -eq 19)) { return $false }
     if ($a -eq 192 -and $b -eq 0 -and $c -eq 2) { return $false }
     if ($a -eq 198 -and $b -eq 51 -and $c -eq 100) { return $false }
@@ -110,6 +163,7 @@ function Test-PublicIPv4 {
 
 Write-Host "=== GeniaProxy source preflight ==="
 Write-Host "Root: $root"
+Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
 Write-Host "Matched secret values are never printed."
 Write-Host ""
 
@@ -117,7 +171,7 @@ $files = Get-ChildItem -LiteralPath $root -Recurse -File -Force |
     Where-Object { -not (Test-ExcludedPath $_.FullName) }
 
 foreach ($file in $files) {
-    $relative = Get-RelativePath $file.FullName
+    $relative = Get-RelativePathCompat $file.FullName
     $extension = $file.Extension.ToLowerInvariant()
     $name = $file.Name.ToLowerInvariant()
 
@@ -144,33 +198,79 @@ foreach ($file in $files) {
                 Add-Finding -File $relative -Line $lineNumber -Rule "Embedded private key"
             }
 
-            if ($line -match '(?i)\b(vless|hysteria2?|hy2|trojan|tuic|ss|socks5?)://[^\s''"]+') {
-                if (-not (Test-PlaceholderValue $line)) {
-                    Add-Finding -File $relative -Line $lineNumber -Rule "Proxy/access URI"
-                }
-            }
-
-            if ($line -match '(?i)\b(password|passwd|token|api[_-]?key|secret|private[_-]?key|privateKey)\b\s*["'']?\s*[:=]\s*["'']?\s*[^\s"'']{6,}') {
-                if (-not (Test-PlaceholderValue $line)) {
-                    Add-Finding -File $relative -Line $lineNumber -Rule "Credential or private-key assignment"
-                }
-            }
-
-            if ($line -match '(?i)\b(uuid|user[_-]?id|client[_-]?id)\b\s*["'']?\s*[:=]\s*["'']?\s*[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}') {
-                if (-not (Test-PlaceholderValue $line)) {
+            # Literal UUID assigned to an access-related field.
+            if ($line -match '(?i)\b(uuid|user[_-]?id|client[_-]?id)\b.*[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}') {
+                if (-not (Test-PlaceholderLine $line)) {
                     Add-Finding -File $relative -Line $lineNumber -Rule "Potential access UUID"
                 }
             }
 
-            if ($line -match '(?i)\b(server|address|endpoint|host|sni)\b\s*["'']?\s*[:=]\s*["'']?\s*([a-z0-9][a-z0-9.-]+\.[a-z]{2,})') {
-                if (($line -notmatch '(?i)(example\.(com|org|net)|example\.invalid|localhost)') -and
-                    (-not (Test-PlaceholderValue $line))) {
+            # Complete static proxy/access URI. Runtime interpolation and test fixtures are ignored.
+            $uriMatch = [regex]::Match(
+                $line,
+                '(?i)\b(?:vless|hysteria2?|hy2|trojan|tuic|ss|socks5?)://[^\s''"]+'
+            )
+
+            if ($uriMatch.Success) {
+                $uriText = $uriMatch.Value
+                $hasCredentialShape =
+                    ($uriText -match '@') -or
+                    ($uriText -match '(?i)^ss://[A-Za-z0-9+/_=-]{20,}')
+
+                $isSafeUri =
+                    (Test-PlaceholderLine $line) -or
+                    ($line -match '[{}]') -or
+                    ($line -match '(?i)(localhost|127\.0\.0\.1|198\.51\.100\.|203\.0\.113\.|192\.0\.2\.|example\.(com|org|net)|example\.invalid)') -or
+                    (-not $hasCredentialShape)
+
+                if (-not $isSafeUri) {
+                    Add-Finding -File $relative -Line $lineNumber -Rule "Proxy/access URI"
+                }
+            }
+
+            # Literal credentials only; variable assignments are intentionally ignored.
+            $credentialMatch = [regex]::Match(
+                $line,
+                '(?i)\b(password|passwd|token|api[_-]?key|secret|private[_-]?key|privateKey)\b\s*[:=]\s*["'']([^"'']{6,})["'']'
+            )
+
+            if ($credentialMatch.Success -and (-not (Test-PlaceholderLine $line))) {
+                Add-Finding -File $relative -Line $lineNumber -Rule "Credential or private-key assignment"
+            }
+
+            # Literal host/endpoint assignments only.
+            $hostMatch = [regex]::Match(
+                $line,
+                '(?i)\b(server|address|endpoint|host|sni)\b\s*[:=]\s*["'']([a-z0-9][a-z0-9.-]+\.[a-z]{2,})["'']'
+            )
+
+            if ($hostMatch.Success) {
+                $hostValue = $hostMatch.Groups[2].Value.ToLowerInvariant()
+                $isKnownHost =
+                    ($knownPublicProbeHosts -contains $hostValue) -or
+                    ($hostValue -match '(^|\.)example\.(com|org|net)$') -or
+                    ($hostValue -eq "example.invalid") -or
+                    ($hostValue -eq "localhost")
+
+                if ((-not $isKnownHost) -and (-not (Test-PlaceholderLine $line))) {
                     Add-Finding -File $relative -Line $lineNumber -Rule "Potential production hostname/endpoint"
                 }
             }
 
             foreach ($match in [regex]::Matches($line, '(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)')) {
-                if (Test-PublicIPv4 $match.Value) {
+                $address = $match.Value
+
+                if (Test-VersionContext $line) {
+                    continue
+                }
+
+                # Intentional split-default-route prefixes.
+                if (($address -eq "0.0.0.0" -or $address -eq "128.0.0.0") -and
+                    ($line -match ([regex]::Escape($address) + '/1'))) {
+                    continue
+                }
+
+                if (Test-PublicIPv4 $address) {
                     Add-Finding -File $relative -Line $lineNumber -Rule "Public IPv4 address"
                 }
             }
@@ -184,11 +284,11 @@ foreach ($file in $files) {
 $findings = $findings |
     Sort-Object File, Line, Rule -Unique
 
-if ($findings.Count -gt 0) {
+if (@($findings).Count -gt 0) {
     Write-Host "PRECHECK FAILED: review the following locations before any public push." -ForegroundColor Red
     $findings | Format-Table -AutoSize
     Write-Host ""
-    Write-Host "Replace real values with explicit placeholders, then rerun this script."
+    Write-Host "Review or replace real values, then rerun this script."
     exit 1
 }
 

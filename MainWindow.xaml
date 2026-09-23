@@ -1,0 +1,658 @@
+<Window x:Class="GeniaProxy.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GeniaProxy 4.4.0 Final Stable Direct Bridge"
+        Width="980"
+        Height="530"
+        MinWidth="900"
+        MinHeight="500"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="SingleBorderWindow"
+        ResizeMode="CanResize"
+        Background="#071521"
+        FontFamily="Segoe UI"
+        Foreground="#F2F7FA"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Loaded="Window_Loaded"
+        StateChanged="Window_StateChanged"
+        Closing="Window_Closing">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="WindowBrush" Color="#071521" />
+        <SolidColorBrush x:Key="CardBrush" Color="#0B1E2C" />
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#365A6D" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#28D9C5" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#9CADB8" />
+
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Padding" Value="12" />
+        </Style>
+
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Foreground" Value="#EFFFFD" />
+            <Setter Property="Background" Value="#0B2530" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ActionBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="0">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ActionBorder" Property="Background" Value="#123744" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ActionBorder" Property="Background" Value="#18505B" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CompactButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="11,5" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#06131D" />
+            <Setter Property="Foreground" Value="#F2F7FA" />
+            <Setter Property="BorderBrush" Value="#315365" />
+            <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="MinHeight" Value="32" />
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#F3F7F9" />
+            <Setter Property="Foreground" Value="#10202A" />
+            <Setter Property="BorderBrush" Value="#315365" />
+            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="MinHeight" Value="32" />
+        </Style>
+
+        <Style x:Key="PopupMenuButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#F2F7FA" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="13,8" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="PopupItemBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="0">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="PopupItemBorder"
+                                        Property="Background"
+                                        Value="#15506A" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="PopupItemBorder"
+                                        Property="Background"
+                                        Value="#1A6178" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.38" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Explicit templates avoid native light-theme glyph/background artifacts
+             in the log context menu on dark Windows themes. -->
+        <Style x:Key="LogContextMenuStyle" TargetType="{x:Type ContextMenu}">
+            <Setter Property="Background" Value="#0B1E2C" />
+            <Setter Property="Foreground" Value="#F2F7FA" />
+            <Setter Property="BorderBrush" Value="#315365" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ContextMenu}">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="0"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <StackPanel IsItemsHost="True"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="LogMenuItemStyle" TargetType="{x:Type MenuItem}">
+            <Setter Property="Foreground" Value="#F2F7FA" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="MinWidth" Value="170" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type MenuItem}">
+                        <Border x:Name="MenuItemBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="0"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="MenuItemBorder"
+                                        Property="Background"
+                                        Value="#15506A" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="MenuItemBorder"
+                                        Property="Background"
+                                        Value="#15506A" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.38" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="{StaticResource WindowBrush}" Margin="18,12,18,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56" />
+            <RowDefinition Height="242" />
+            <RowDefinition Height="110" />
+            <RowDefinition x:Name="LogRow" Height="0" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: product identity, portable/security baseline and quick actions. -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock FontSize="22" FontWeight="Bold">
+                    <Run Text="Genia" />
+                    <Run Text="Proxy" Foreground="{StaticResource AccentBrush}" />
+                </TextBlock>
+                <Border Background="#173240"
+                        CornerRadius="0"
+                        Padding="8,3"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Center">
+                    <TextBlock x:Name="VersionBadgeText"
+                               Text="4.4.0 Final Stable Direct Bridge"
+                               Foreground="#9EDDD6"
+                               FontSize="10"
+                               FontWeight="SemiBold" />
+                </Border>
+                <Border Background="#0B2530"
+                        BorderBrush="#315365"
+                        BorderThickness="1"
+                        CornerRadius="0"
+                        Padding="8,3"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        ToolTip="Portable-first: профили, настройки и runtime остаются рядом с GeniaProxy.exe.">
+                    <TextBlock Text="PORTABLE"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="10"
+                               FontWeight="SemiBold" />
+                </Border>
+                <Border x:Name="GuardBadge"
+                        Background="#0B2530"
+                        BorderBrush="{StaticResource AccentBrush}"
+                        BorderThickness="1"
+                        CornerRadius="0"
+                        Padding="8,3"
+                        MinWidth="82"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center"
+                        ToolTip="HF4 security baseline готов. WFP Strict Kill Switch будет отдельным этапом 4.3.">
+                    <TextBlock x:Name="GuardBadgeText"
+                               Text="GUARD READY"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               TextAlignment="Center"
+                               HorizontalAlignment="Center" />
+                </Border>
+                <Border x:Name="ElevationBadge"
+                        Background="#0B2530"
+                        BorderBrush="#315365"
+                        BorderThickness="1"
+                        CornerRadius="0"
+                        Padding="8,3"
+                        MinWidth="52"
+                        Margin="8,0,0,0"
+                        VerticalAlignment="Center">
+                    <TextBlock x:Name="ElevationBadgeText"
+                               Text="USER"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               TextAlignment="Center"
+                               HorizontalAlignment="Center" />
+                </Border>
+                <ProgressBar x:Name="OperationProgress"
+                             Width="88"
+                             Height="4"
+                             Margin="12,0,0,0"
+                             IsIndeterminate="True"
+                             Visibility="Collapsed"
+                             Foreground="{StaticResource AccentBrush}"
+                             VerticalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Button x:Name="ImportProfileButton"
+                        Style="{StaticResource CompactButtonStyle}"
+                        Content="Импорт"
+                        Click="ImportProfileButton_Click" />
+                <Button Style="{StaticResource CompactButtonStyle}"
+                        Content="Проверка 1+20"
+                        Margin="8,0,0,0"
+                        Click="ConnectionTestMenuItem_Click" />
+                <Button x:Name="ServiceButton"
+                        Style="{StaticResource CompactButtonStyle}"
+                        Content="Сервис ▾"
+                        Margin="8,0,0,0"
+                        Click="ServiceButton_Click" />
+                <Button x:Name="ToggleLogButton"
+                        Style="{StaticResource CompactButtonStyle}"
+                        Content="Журнал"
+                        Margin="8,0,0,0"
+                        Click="ToggleLogButton_Click" />
+            </StackPanel>
+        </Grid>
+
+        <Popup x:Name="ServicePopup"
+               Grid.Row="0"
+               PlacementTarget="{Binding ElementName=ServiceButton}"
+               Placement="Bottom"
+               HorizontalOffset="-92"
+               AllowsTransparency="True"
+               PopupAnimation="Fade"
+               StaysOpen="False">
+            <Border Width="300"
+                    Margin="0,5,0,0"
+                    Padding="5"
+                    Background="#0B1E2C"
+                    BorderBrush="#315365"
+                    BorderThickness="1"
+                    CornerRadius="0">
+                <StackPanel>
+                    <TextBlock Text="ПРОФИЛИ" Foreground="#6F8795" FontSize="10" Margin="12,6,12,2" />
+                    <Button x:Name="ImportProfileMenuItem"
+                            Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Импортировать профиль..."
+                            Click="ImportProfileMenuItem_Click" />
+                    <Button x:Name="RefreshProfilesMenuItem"
+                            Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Обновить список профилей"
+                            Click="RefreshProfilesButton_Click" />
+                    <Button x:Name="ProfileInformationMenuItem"
+                            Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Сведения о выбранном профиле..."
+                            Click="ProfileInformationMenuItem_Click" />
+                    <Button x:Name="ShareProfileMenuItem"
+                            Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Поделиться профилем (QR)..."
+                            Click="ShareProfileMenuItem_Click" />
+                    <Button x:Name="RenameProfileMenuItem"
+                            Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Переименовать профиль..."
+                            Click="RenameProfileMenuItem_Click" />
+                    <Button x:Name="DeleteProfileMenuItem"
+                            Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Удалить профиль..."
+                            Click="DeleteProfileMenuItem_Click" />
+                    <Border Height="1" Background="#315365" Margin="7,4" />
+                    <TextBlock Text="PORTABLE DATA" Foreground="#6F8795" FontSize="10" Margin="12,6,12,2" />
+                    <Button Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Создать резервную копию..."
+                            Click="ExportProfilesMenuItem_Click" />
+                    <Button x:Name="RestoreProfilesMenuItem"
+                            Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Восстановить резервную копию..."
+                            Click="RestoreProfilesMenuItem_Click" />
+                    <Border Height="1" Background="#315365" Margin="7,4" />
+                    <TextBlock Text="СЕРВИС И БЕЗОПАСНОСТЬ" Foreground="#6F8795" FontSize="10" Margin="12,6,12,2" />
+                    <Button Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Ядро sing-box..."
+                            Click="CoreManagementMenuItem_Click" />
+                    <Button Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Ядро Xray..."
+                            Click="XrayManagementMenuItem_Click" />
+                    <Button Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Диагностика..."
+                            Click="DiagnosticsMenuItem_Click" />
+                    <Button Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Интеграция с браузером..."
+                            Click="BrowserIntegrationMenuItem_Click" />
+                    <Button x:Name="ConnectionTestMenuItem"
+                            Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Проверить канал и утечки (1 + 20)..."
+                            Click="ConnectionTestMenuItem_Click" />
+                    <Button Style="{StaticResource PopupMenuButtonStyle}"
+                            Content="Настройки..."
+                            Click="SettingsMenuItem_Click" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- Main dashboard -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="0.92*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="1.32*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="ConnectionIndicator"
+                                Width="7"
+                                Height="7"
+                                Background="#5A6D78"
+                                BorderBrush="#5A6D78"
+                                BorderThickness="1"
+                                VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="СОСТОЯНИЕ"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Margin="9,0,0,0" />
+                    </Grid>
+
+                    <StackPanel Grid.Row="1"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                MaxWidth="330">
+                        <TextBlock x:Name="ConnectionStatusText"
+                                   Text="Остановлено"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedBrush}" />
+                        <TextBlock x:Name="ConnectionDetailText"
+                                   Text="Ядро остановлено"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,5,0,0" />
+                        <Border Height="1" Background="#274757" Margin="36,12" />
+                        <TextBlock x:Name="RouteSummaryText"
+                                   Text="Маршрут не активен"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   Foreground="#7F96A3"
+                                   FontSize="11" />
+                    </StackPanel>
+
+                    <Button x:Name="ToggleConnectionButton"
+                            Grid.Row="2"
+                            Style="{StaticResource ActionButtonStyle}"
+                            Content="ПОДКЛЮЧИТЬ"
+                            Width="230"
+                            HorizontalAlignment="Center"
+                            Click="ToggleConnectionButton_Click" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="ПРОФИЛЬ И МАРШРУТ"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold" />
+                    <ComboBox x:Name="ProfileComboBox"
+                              Grid.Row="1"
+                              Margin="0,8,0,0"
+                              SelectionChanged="ProfileComboBox_SelectionChanged" />
+
+                    <Grid Grid.Row="2" Margin="0,13,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.25*" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="0.9*" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Протокол" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                            <TextBlock x:Name="SelectedProtocolText"
+                                       Text="Не определён"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Margin="0,3,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Режим" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                            <ComboBox x:Name="ConnectionModeComboBox"
+                                      Width="180"
+                                      Margin="0,5,0,0"
+                                      HorizontalAlignment="Left"
+                                      SelectionChanged="ConnectionModeComboBox_SelectionChanged"
+                                      SelectedIndex="0">
+                                <ComboBoxItem Content="Локальный" />
+                                <ComboBoxItem Content="Системный" />
+                                <ComboBoxItem Content="TUN (рекомендуется)" />
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="Порт" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                            <TextBox x:Name="PortTextBox"
+                                     Width="72"
+                                     Margin="0,5,0,0"
+                                     Text="2080"
+                                     LostFocus="PortTextBox_LostFocus"
+                                     TextAlignment="Center"
+                                     MaxLength="5" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="3" Margin="0,13,0,0" VerticalAlignment="Bottom">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Системный proxy" Foreground="{StaticResource MutedBrush}" FontSize="11" />
+                            <TextBlock x:Name="SystemProxyValueText"
+                                       Text="Не изменяется"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Margin="0,3,0,0" />
+                        </StackPanel>
+                        <TextBlock x:Name="ModeHintText"
+                                   Grid.Column="1"
+                                   Text="TUN доступен · полный маршрут"
+                                   Foreground="#6F8795"
+                                   FontSize="11"
+                                   VerticalAlignment="Bottom" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Live telemetry strip. Keeps the compact window useful without opening diagnostics. -->
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="0.9*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="1.05*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="0.85*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="1.35*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="1.35*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="ЯДРО" Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                    <TextBlock x:Name="CoreValueText" Text="—" FontSize="15" FontWeight="SemiBold" Margin="0,3,0,0" />
+                    <TextBlock x:Name="ProtocolValueText" Text="—" Foreground="#7F96A3" FontSize="10" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="РЕЖИМ" Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                    <TextBlock x:Name="ModeValueText" Text="—" FontSize="15" FontWeight="SemiBold" Margin="0,3,0,0" />
+                    <TextBlock x:Name="LocalProxyValueText" Text="SOCKS5 · 127.0.0.1:2080" Foreground="#7F96A3" FontSize="10" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="4" Style="{StaticResource CardStyle}" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="СЕАНС" Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                    <TextBlock x:Name="SessionValueText" Text="00:00:00" FontSize="15" FontWeight="SemiBold" Margin="0,3,0,0" />
+                    <TextBlock Text="uptime" Foreground="#7F96A3" FontSize="10" Margin="0,2,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="6" Style="{StaticResource CardStyle}" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="СЕРВЕР" Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                    <TextBlock x:Name="RemoteServerValueText" Text="—" FontSize="13" FontWeight="SemiBold" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="endpoint профиля" Foreground="#7F96A3" FontSize="10" Margin="0,2,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="8" Style="{StaticResource CardStyle}" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="ВЫХОД" Foreground="{StaticResource MutedBrush}" FontSize="10" />
+                    <TextBlock x:Name="ExitIpValueText" Text="—" FontSize="13" FontWeight="SemiBold" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="после privacy probe" Foreground="#7F96A3" FontSize="10" Margin="0,2,0,0" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border x:Name="LogCard"
+                Grid.Row="3"
+                Style="{StaticResource CardStyle}"
+                Margin="0,12,0,0"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="ЖУРНАЛ ТЕКУЩЕГО ЗАПУСКА"
+                               FontSize="12"
+                               FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1"
+                               Text="runtime · локально"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="10" />
+                </Grid>
+                <TextBox x:Name="LogTextBox"
+                         Grid.Row="1"
+                         Margin="0,9,0,0"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Disabled"
+                         TextWrapping="Wrap"
+                         FontFamily="Consolas"
+                         FontSize="12">
+                    <TextBox.ContextMenu>
+                        <ContextMenu x:Name="LogContextMenu"
+                                     Style="{StaticResource LogContextMenuStyle}"
+                                     Opened="LogContextMenu_Opened">
+                            <MenuItem x:Name="CopyAllLogButton"
+                                      Style="{StaticResource LogMenuItemStyle}"
+                                      Header="Копировать всё"
+                                      Click="CopyAllLogButton_Click" />
+                            <MenuItem x:Name="DetailedCoreLogButton"
+                                      Style="{StaticResource LogMenuItemStyle}"
+                                      Header="Подробный журнал ядра: выключен"
+                                      Click="DetailedCoreLogButton_Click" />
+                            <MenuItem x:Name="ClearLogButton"
+                                      Style="{StaticResource LogMenuItemStyle}"
+                                      Header="Очистить журнал"
+                                      Click="ClearLogButton_Click" />
+                        </ContextMenu>
+                    </TextBox.ContextMenu>
+                </TextBox>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
