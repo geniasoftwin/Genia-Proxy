@@ -31,7 +31,7 @@ $textExtensions = @(
     ".xml", ".config", ".md", ".txt", ".env", ".example"
 )
 
-$findings = [System.Collections.Generic.List[object]]::new()
+$findings = New-Object 'System.Collections.Generic.List[object]'
 
 function Add-Finding {
     param(
@@ -50,7 +50,26 @@ function Add-Finding {
 function Get-RelativePath {
     param([string]$FullName)
 
-    return [System.IO.Path]::GetRelativePath($root, $FullName)
+    # PowerShell 5.1 runs on .NET Framework, which does not provide
+    # System.IO.Path.GetRelativePath(). Keep this helper compatible with
+    # both Windows PowerShell 5.1 and PowerShell 7+.
+    $resolved = [System.IO.Path]::GetFullPath($FullName)
+    $base = [System.IO.Path]::GetFullPath($root)
+    $separator = [string][System.IO.Path]::DirectorySeparatorChar
+
+    if ($resolved.Equals($base, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return "."
+    }
+
+    if (-not $base.EndsWith($separator)) {
+        $base += $separator
+    }
+
+    if ($resolved.StartsWith($base, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $resolved.Substring($base.Length)
+    }
+
+    return $resolved
 }
 
 function Test-ExcludedPath {
@@ -110,6 +129,7 @@ function Test-PublicIPv4 {
 
 Write-Host "=== GeniaProxy source preflight ==="
 Write-Host "Root: $root"
+Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
 Write-Host "Matched secret values are never printed."
 Write-Host ""
 
@@ -184,7 +204,7 @@ foreach ($file in $files) {
 $findings = $findings |
     Sort-Object File, Line, Rule -Unique
 
-if ($findings.Count -gt 0) {
+if (@($findings).Count -gt 0) {
     Write-Host "PRECHECK FAILED: review the following locations before any public push." -ForegroundColor Red
     $findings | Format-Table -AutoSize
     Write-Host ""
