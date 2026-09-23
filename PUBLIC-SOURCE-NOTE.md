@@ -11,3 +11,7 @@ For repository safety:
 - no production profile, UUID, password, token, private key, certificate private material, or real proxy access URI is intentionally included.
 
 These public-source substitutions do not represent deployable server endpoints. Users must supply their own lawful server/profile configuration.
+
+## Package manifest scope
+
+`PUBLIC-SOURCE-PACKAGE-MANIFEST.sha256` records the sanitized package as it existed before GitHub import. It is kept for provenance only and must not be interpreted as a checksum manifest for the current repository tree. The import deliberately preserved repository-owned root files and normalized trailing whitespace in a small set of source/UI files.
