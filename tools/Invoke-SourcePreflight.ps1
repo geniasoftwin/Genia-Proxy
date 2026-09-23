@@ -107,13 +107,18 @@ function Test-PlaceholderLine {
 function Test-VersionContext {
     param([string]$Line)
 
-    return $Line -match '(?i)(version|fileversion|assemblyversion|manifestversion|switchermanifestversion)'
+    return $Line -match '(?i)(version|fileversion|assemblyversion|manifestversion|switchermanifestversion|manifest\s+build)'
 }
 
 function Test-PublicIPv4 {
     param([string]$Address)
 
     if ($knownPublicInfrastructureIPv4 -contains $Address) {
+        return $false
+    }
+
+    # Route prefix used for split-default routing, not a server endpoint.
+    if ($Address -eq "128.0.0.0") {
         return $false
     }
 
@@ -207,10 +212,16 @@ foreach ($file in $files) {
             )
 
             if ($uriMatch.Success) {
+                $uriText = $uriMatch.Value
+                $hasCredentialShape =
+                    ($uriText -match '@') -or
+                    ($uriText -match '(?i)^ss://[A-Za-z0-9+/_=-]{20,}')
+
                 $isSafeUri =
                     (Test-PlaceholderLine $line) -or
                     ($line -match '[{}]') -or
-                    ($line -match '(127\.0\.0\.1|198\.51\.100\.|203\.0\.113\.|192\.0\.2\.)')
+                    ($line -match '(?i)(localhost|127\.0\.0\.1|198\.51\.100\.|203\.0\.113\.|192\.0\.2\.|example\.(com|org|net)|example\.invalid)') -or
+                    (-not $hasCredentialShape)
 
                 if (-not $isSafeUri) {
                     Add-Finding -File $relative -Line $lineNumber -Rule "Proxy/access URI"
