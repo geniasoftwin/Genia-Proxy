@@ -4,6 +4,9 @@ This is the publication gate for the GeniaProxy 4.4.0 Final Stable Direct Bridge
 
 ## Source identity
 
+The file `PUBLIC-SOURCE-PACKAGE-MANIFEST.sha256` is a provenance manifest for the sanitized package *before* repository import. It is intentionally not a manifest of the current Git tree, because repository-owned files were preserved and minor whitespace normalization occurred during import.
+
+
 - Input archive SHA-256: `3f28f700baa84a798ef1280bf94f9682af74785bcf7e0a0de99d5593aaa96e13`
 - Project version: `4.4.0`
 - Target framework: `net10.0-windows`
