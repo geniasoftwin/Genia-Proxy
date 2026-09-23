@@ -1,0 +1,28 @@
+GeniaProxy 4.2.0
+================
+
+Главное:
+- два ядра: sing-box и Xray с автоматическим выбором по профилю;
+- режимы: локальный SOCKS5, системный прокси Windows и TUN;
+- отдельные порт, режим, ядро и TUN-стек для каждого профиля;
+- встроенная проверка канала: 1 + 20 HTTPS-запросов;
+- VLESS + XHTTP + TLS с stream-one и XMUX;
+- sing-box 1.13.18: mixed/system/gVisor, auto_route/strict_route; mixed и gVisor подтверждены Windows integration-тестами;
+- sing-box TUN: DNS 1.1.1.1/1.0.0.1 назначается интерфейсу GeniaProxy, IPv4 metric = 5, физический DNS не меняется;
+- Xray TUN: endpoint /32 bypass, две /1 routes, explicit owned-route verification, leak-safe DNS, rollback и crash recovery под управлением GeniaProxy;
+- TUN Running выставляется только после adapter/route/DNS/HTTPS readiness;
+- тёмное контекстное меню журнала без системных светлых артефактов;
+- PowerShell diagnostics выводятся в UTF-8 без битой кириллицы.
+
+Сборка:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\build-release.ps1"
+
+Ожидаемый архив:
+GeniaProxy-portable-win-x64-v4.2.0.zip
+
+Final v3 cleanup (2026-08-14)
+- Xray TUN readiness uses the validated route + DNS + pinned HTTPS readiness path.
+- Routine core traffic lines are hidden from the default UI journal.
+- Important core errors remain visible; failed config checks dump full core output.
+- The journal context menu can toggle "Подробный журнал ядра" for new messages.
+- Network behavior and validated engine binaries are otherwise unchanged.

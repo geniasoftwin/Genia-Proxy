@@ -1,0 +1,25 @@
+GeniaProxy 4.3.3 Final Stable LTS
+=================================
+
+Base: validated GeniaProxy 4.3.2 Final Stable LTS Windows network/TUN/Xray baseline.
+
+Final maintenance scope:
+- sing-box 1.14.0 stable pin;
+- NativeHost Bridge v2 RC5 read-only integration;
+- Genia Proxy Switcher 5.5.6 Stable;
+- Local SOCKS + Trusted Exit + WebRTC Shield + fail-closed Hard Kill Switch;
+- read-only TUN Monitor and adaptive fail-closed TUN warm-up verification;
+- verified exit metadata from successful GeniaProxy channel tests;
+- automatic Local -> TUN -> Local browser routing handoff;
+- stable browser extension folder: browser-integration\Genia-Proxy-Switcher;
+- single UI action opens the current browser-integration folder;
+- no hard-coded extension version directory;
+- no intended changes to validated Windows TUN/DNS/Xray network orchestration.
+
+Pinned sing-box 1.14.0 SHA256:
+AAD0EDE010EAFA7B277E520464F3A66FDE820103D737EFF739F40F3CC9451DCC
+
+Bundled NativeHost Bridge v2 RC5 SHA256:
+8CA5A9B30B7F2FD3A15B63729E65BF4F9FCA4916859B2FA2B491A5DFE0419095
+
+Status: FINAL STABLE LTS.

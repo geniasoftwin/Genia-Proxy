@@ -1,0 +1,25 @@
+GeniaProxy 4.3.1 Experimental — REALITY + XMUX
+================================================
+
+Base:
+- Runtime/network baseline: GeniaProxy 4.3.0 Final Stable.
+- Source input: 4.3.0 Alpha 1.1 UI Polish kit; Final Stable status confirms the network/profile services and engines were frozen byte-for-byte from this baseline.
+- Existing TLS/TUN/DNS/rollback/security behavior is preserved.
+- Bundled Xray remains 26.3.27 d2758a0.
+
+Added:
+- Native import of VLESS + XHTTP + REALITY links.
+- REALITY client fields: serverName, fingerprint, publicKey/password compatibility (runtime canonicalized to publicKey), shortId, spiderX.
+- Existing XHTTP XMUX defaults are reused without changing their values.
+- REALITY-aware QR/share round-trip.
+- Fail-closed REALITY validation and regression tests.
+
+Validated external reference before integration:
+- VLESS + XHTTP stream-one + REALITY + XMUX on TCP/8443.
+- 20/20 concurrent requests successful.
+- Five repeated runs: 100/100 successful, 0 failed.
+- Exit IP verified as the VPS address in the diagnostic test.
+
+Isolation rule:
+- Production VLESS + XHTTP + TLS / TCP 443 is not changed by this branch.
+- REALITY remains experimental until the generated runtime profile is tested from this build on Windows.

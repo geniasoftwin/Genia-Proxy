@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="GeniaProxy.csproj" />
+  <Project Path="tests/GeniaProxy.Tests/GeniaProxy.Tests.csproj" />
+</Solution>

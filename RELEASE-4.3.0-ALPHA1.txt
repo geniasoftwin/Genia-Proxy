@@ -1,0 +1,30 @@
+GeniaProxy 4.3.0 Alpha 1 — Portable/UI Foundation
+================================================
+
+Base:
+- GeniaProxy 4.2.1 HF4 Security.
+- HF4 security fixes are preserved.
+- Bundled xray.exe, sing-box.exe and wintun.dll are unchanged.
+- XHTTP/XMUX, TUN routing, DNS, rollback, QR and privacy probe logic are not redesigned in this milestone.
+
+What Alpha 1 changes:
+- Version line moved to 4.3.0 development branch.
+- Portable-first UI identity: PORTABLE badge.
+- Security-baseline UI identity: GUARD badge (HF4 baseline only; this does not claim WFP kill switch/broker yet).
+- Wider strict/square dashboard while keeping the navy + cyan/teal palette.
+- One-click 1+20 privacy/channel test in the main header.
+- Main connection card now shows a live route summary.
+- Live telemetry strip: core, mode, session, endpoint server and exit IP.
+- Service popup is grouped into Profiles / Portable Data / Service & Security.
+- Log remains collapsible and local.
+
+Planned 4.3 architecture stages (not yet implemented in Alpha 1):
+1. Privilege-separated elevated broker.
+2. Optional WFP Strict Kill Switch.
+3. Signed engine manifest / embedded trust root.
+4. Portable protected vault mode without requiring LocalAppData.
+5. Network-change state machine (Wi-Fi/Ethernet/sleep/resume).
+6. Security Center and redacted diagnostic bundle.
+
+Important:
+This is an Alpha development branch. It is intentionally not labelled Final Stable.

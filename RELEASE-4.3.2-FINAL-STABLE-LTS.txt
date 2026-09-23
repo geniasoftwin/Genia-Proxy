@@ -1,0 +1,19 @@
+GeniaProxy 4.3.2 Final Stable LTS
+===================================
+
+Status: FINAL STABLE / LONG-TERM FROZEN
+Promoted from: 4.3.2 LTS RC2
+Date: 2026-08-28
+
+Validated:
+- Hysteria2 + TLS
+- VLESS + XHTTP + TLS
+- VLESS + XHTTP stream-one + XMUX + REALITY
+- Local SOCKS5 / System Proxy / TUN
+- 30 automated source tests, 0 errors
+- manual 20/20 channel tests across Hysteria2, XHTTP/TLS and REALITY
+- REALITY TUN 20/20 + IPv6 leak probe PASS
+- DNS route rollback and forced-crash recovery
+
+NETWORK BASELINE: FROZEN
+No experimental functionality is accepted into this branch after Final Stable.

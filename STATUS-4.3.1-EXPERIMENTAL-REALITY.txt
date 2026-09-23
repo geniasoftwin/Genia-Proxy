@@ -1,0 +1,44 @@
+GeniaProxy 4.3.1 Experimental REALITY + XMUX — Integration Status
+=================================================================
+
+BASE
+- Runtime/network baseline: GeniaProxy 4.3.0 Final Stable / HF4.
+- Input archive: GeniaProxy 4.3.0 A1.1 UI Polish kit.
+- 4.3.0 Final Stable froze Xray profile/share, TUN/DNS/rollback and engines from A1.1/HF4; this branch deliberately changes only REALITY/profile/share/version surfaces plus tests/docs.
+
+IMPLEMENTED
+- security=reality for VLESS + XHTTP URI import.
+- realitySettings.serverName.
+- realitySettings.fingerprint.
+- realitySettings.publicKey generation for bundled Xray 26.3.27.
+- Compatibility import of realitySettings.password, canonicalized to publicKey for bundled Xray 26.3.27.
+- realitySettings.shortId validation (0..16 hex chars, even length).
+- realitySettings.spiderX.
+- Existing XHTTP XMUX defaults preserved.
+- JSON normalization validates REALITY client settings.
+- QR/share supports REALITY parameters and round-trip.
+- UI import hint mentions TLS/REALITY.
+- Regression tests added.
+
+NOT CHANGED
+- TUN routing.
+- DNS handling.
+- rollback/crash recovery.
+- system proxy behavior.
+- stable TLS profile generation.
+- bundled engines.
+
+WINDOWS VALIDATION REQUIRED
+1. dotnet run --project .\tests\GeniaProxy.Tests\GeniaProxy.Tests.csproj  (expected: 30 tests, 0 errors)
+2. Build with official build-release.ps1.
+3. Import the known-good REALITY vless:// profile.
+4. Confirm generated runtime JSON with xray.exe run -test -config <file>.
+5. Local SOCKS test and verify VPS exit IP.
+6. 20/20 concurrent test, then 5x20 stability test.
+7. Re-run one stable TLS/443 profile to confirm regression-free behavior.
+
+Runtime interoperability correction (FIX4):
+- REALITY vless:// import defaults omitted XHTTP mode to stream-one, matching the validated 100/100 reference.
+- Newly generated REALITY client configs use `password` (Password/PublicKey) for Xray 26.3.27.
+- Imported JSON preserves the original `password` or legacy `publicKey` field instead of rewriting it at runtime.
+- Production TLS/TUN/DNS/rollback behavior remains unchanged.

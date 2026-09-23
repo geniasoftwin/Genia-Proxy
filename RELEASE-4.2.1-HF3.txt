@@ -1,0 +1,26 @@
+GeniaProxy 4.2.1 HF3 — Final UX Handoff / Endpoint Polish
+==========================================================
+
+Основа: GeniaProxy 4.2.1 HF2 Final Candidate.
+Сетевая архитектура и ядра не изменялись.
+
+Изменения HF3:
+- ускорен USER -> ADMIN handoff для TUN: если соединение ещё не запускалось,
+  старое USER-окно скрывается и освобождает single-instance без прохождения
+  лишнего общего shutdown-path;
+- при активной/переходной сетевой операции сохранён обычный безопасный shutdown;
+- в статусной карточке динамически показывается сервер выбранного профиля;
+- IP не зашит в код: Hysteria2/sing-box и VLESS/Xray endpoint извлекаются из
+  текущего JSON-профиля, доменное имя разрешается с коротким UI-only timeout;
+- после проверки канала отдельно отображается текущий выходной IP;
+- при смене профиля/новом сеансе старый exit IP не используется как текущий;
+- добавлен регрессионный тест извлечения endpoint Hysteria2/VLESS.
+
+Не изменялись:
+- sing-box/xray/wintun и их SHA256;
+- Xray/sing-box TUN networking;
+- DNS readiness, routes, rollback, crash/reconnect;
+- XHTTP/XMUX;
+- QR compact share links;
+- privacy/IPv6 leak guard;
+- цветовая схема и строгая геометрия UI.

@@ -1,0 +1,162 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<UseWindowsForms>true</UseWindowsForms>
+		<UseWPF>true</UseWPF>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<EnableNETAnalyzers>true</EnableNETAnalyzers>
+		<AnalysisLevel>latest-recommended</AnalysisLevel>
+		<Deterministic>true</Deterministic>
+		<ApplicationIcon>assets\GeniaProxy.ico</ApplicationIcon>
+		<AssemblyName>GeniaProxy</AssemblyName>
+		<Product>GeniaProxy</Product>
+		<Version>4.4.0</Version>
+		<FileVersion>4.4.0.0</FileVersion>
+		<AssemblyVersion>4.4.0.0</AssemblyVersion>
+		<Authors>Genia</Authors>
+		<Description>GeniaProxy 4.4.0 Final Stable Direct Bridge — browser integration hosted inside GeniaProxy.exe with no NativeHost helper; frozen 4.3.3 network/TUN baseline.</Description>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Remove="tests\**\*.cs" />
+		<EmbeddedResource Remove="tests\**\*" />
+		<None Remove="tests\**\*" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="QRCoder" Version="1.8.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Remove="engine\sing-box.exe" />
+		<None Remove="engine\sing-box.sha256" />
+		<None Remove="engine\xray.exe" />
+		<None Remove="engine\xray.sha256" />
+		<None Remove="engine\wintun.dll" />
+		<None Remove="engine\wintun.sha256" />
+		<None Remove="engine\XRAY-LICENSE.txt" />
+		<None Remove="engine\SING-BOX-LICENSE.txt" />
+		<None Remove="engine\WINTUN-LICENSE.txt" />
+		<None Remove="THIRD-PARTY-NOTICES.md" />
+		<None Remove="browser-integration\Genia-Proxy-Switcher\**\*" />
+		<None Remove="browser-integration\DIRECT_BRIDGE_PROTOCOL.md" />
+		<None Remove="README-4.4.0-FINAL-STABLE-DIRECT-BRIDGE.md" />
+		<None Remove="SECURITY-4.4.0-FINAL-STABLE-DIRECT-BRIDGE.md" />
+		<None Remove="RELEASE-4.4.0-FINAL-STABLE-DIRECT-BRIDGE.txt" />
+
+
+		<Content Include="engine\sing-box.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+
+		<Content Include="engine\sing-box.sha256">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+
+		<Content Include="engine\xray.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+
+		<Content Include="engine\xray.sha256">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+
+		<Content Include="engine\wintun.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+
+		<Content Include="engine\wintun.sha256">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+
+		<Content Include="engine\XRAY-LICENSE.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="engine\SING-BOX-LICENSE.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="engine\WINTUN-LICENSE.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="THIRD-PARTY-NOTICES.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+
+
+
+		<Content Include="browser-integration\Genia-Proxy-Switcher\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="browser-integration\DIRECT_BRIDGE_PROTOCOL.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+
+		<Content Include="README-4.4.0-FINAL-STABLE-DIRECT-BRIDGE.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="SECURITY-4.4.0-FINAL-STABLE-DIRECT-BRIDGE.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="RELEASE-4.4.0-FINAL-STABLE-DIRECT-BRIDGE.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+	</ItemGroup>
+
+	<!-- Рабочие профили, настройки и временные файлы никогда
+	     не копируются в bin/publish. Программа создаёт data сама. -->
+	<ItemGroup>
+		<None Remove="data\**\*" />
+	</ItemGroup>
+
+	<Target Name="CheckCores"
+	        BeforeTargets="PrepareForBuild">
+		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\sing-box.exe')"
+		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\sing-box.exe" />
+		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\sing-box.sha256')"
+		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\sing-box.sha256" />
+		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\xray.exe')"
+		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\xray.exe" />
+		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\xray.sha256')"
+		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\xray.sha256" />
+		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\wintun.dll')"
+		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\wintun.dll" />
+		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\wintun.sha256')"
+		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\wintun.sha256" />
+		<Error Condition="!Exists('$(MSBuildProjectDirectory)\browser-integration\Genia-Proxy-Switcher\manifest.json')"
+		       Text="Не найдена папка Browser Integration Switcher Direct." />
+	</Target>
+
+</Project>
