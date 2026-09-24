@@ -1,19 +1,23 @@
-using System.Threading;
+using System.IO.Pipes;
+using System.Text;
+using System.Security.Principal;
 
 namespace GeniaProxy.Services
 {
     public sealed class SingleInstanceService : IDisposable
     {
-        private readonly Mutex instanceMutex;
-        private readonly string activationEventName;
+        private const string ActivationRequest = "ACTIVATE";
+        private const string ActivationAck = "ACK";
 
-        private EventWaitHandle? activationEvent;
+        private readonly Mutex instanceMutex;
+        private readonly string activationPipeName;
+
         private CancellationTokenSource? cancellation;
         private Task? listenerTask;
-
+        private bool ownsMutex;
         private bool disposed;
 
-        public bool IsPrimaryInstance { get; }
+        public bool IsPrimaryInstance { get; private set; }
 
         public event EventHandler? ActivationRequested;
 
@@ -28,12 +32,14 @@ namespace GeniaProxy.Services
             }
 
             string safeId = NormalizeApplicationId(applicationId);
+            string mutexName = $@"Local\{safeId}.SingleInstance";
 
-            string mutexName =
-                $@"Local\{safeId}.SingleInstance";
+            string userScope = NormalizeApplicationId(
+                WindowsIdentity.GetCurrent().User?.Value ?? "CurrentUser"
+            );
 
-            activationEventName =
-                $@"Local\{safeId}.Activate";
+            activationPipeName =
+                $"{safeId}.{userScope}.Activation";
 
             instanceMutex = new Mutex(
                 initiallyOwned: true,
@@ -42,30 +48,19 @@ namespace GeniaProxy.Services
             );
 
             IsPrimaryInstance = createdNew;
-
-            if (IsPrimaryInstance)
-            {
-                activationEvent = new EventWaitHandle(
-                    initialState: false,
-                    mode: EventResetMode.AutoReset,
-                    name: activationEventName
-                );
-            }
+            ownsMutex = createdNew;
         }
-
 
         public static bool WaitForPrimaryInstanceExit(
             string applicationId,
             TimeSpan timeout)
         {
             string safeId = NormalizeApplicationId(applicationId);
-            string mutexName =
-                $@"Local\{safeId}.SingleInstance";
+            string mutexName = $@"Local\{safeId}.SingleInstance";
 
             try
             {
-                using Mutex existingMutex =
-                    Mutex.OpenExisting(mutexName);
+                using Mutex existingMutex = Mutex.OpenExisting(mutexName);
 
                 bool acquired;
 
@@ -89,7 +84,7 @@ namespace GeniaProxy.Services
                 }
                 catch (ApplicationException)
                 {
-                    // Mutex мог быть освобождён при завершении владельца.
+                    // Mutex may already have been released during shutdown.
                 }
 
                 return true;
@@ -102,6 +97,229 @@ namespace GeniaProxy.Services
             {
                 return false;
             }
+        }
+
+        public bool TryActivatePrimary(
+            TimeSpan timeout,
+            out string? errorMessage)
+        {
+            ThrowIfDisposed();
+            errorMessage = null;
+
+            if (IsPrimaryInstance)
+            {
+                return true;
+            }
+
+            int timeoutMilliseconds = NormalizeTimeout(timeout);
+
+            try
+            {
+                using var client = new NamedPipeClientStream(
+                    serverName: ".",
+                    pipeName: activationPipeName,
+                    direction: PipeDirection.InOut,
+                    options: PipeOptions.Asynchronous
+                );
+
+                client.Connect(timeoutMilliseconds);
+
+                using var reader = new StreamReader(
+                    client,
+                    Encoding.UTF8,
+                    detectEncodingFromByteOrderMarks: true,
+                    bufferSize: 1024,
+                    leaveOpen: true
+                );
+
+                using var writer = new StreamWriter(
+                    client,
+                    new UTF8Encoding(false),
+                    bufferSize: 1024,
+                    leaveOpen: true
+                )
+                {
+                    AutoFlush = true
+                };
+
+                writer.WriteLine(ActivationRequest);
+
+                Task<string?> responseTask = reader.ReadLineAsync();
+                string? response = responseTask
+                    .WaitAsync(timeout)
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (!string.Equals(
+                        response,
+                        ActivationAck,
+                        StringComparison.Ordinal))
+                {
+                    errorMessage =
+                        "Primary instance returned an invalid activation response.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (TimeoutException)
+            {
+                errorMessage =
+                    "Primary instance activation pipe timed out.";
+                return false;
+            }
+            catch (IOException ex)
+            {
+                errorMessage = ex.Message;
+                return false;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                errorMessage = ex.Message;
+                return false;
+            }
+        }
+
+        public bool TryBecomePrimaryAfterFailedActivation(
+            TimeSpan timeout)
+        {
+            ThrowIfDisposed();
+
+            if (IsPrimaryInstance)
+            {
+                return true;
+            }
+
+            bool acquired;
+
+            try
+            {
+                acquired = instanceMutex.WaitOne(timeout);
+            }
+            catch (AbandonedMutexException)
+            {
+                acquired = true;
+            }
+
+            if (!acquired)
+            {
+                return false;
+            }
+
+            IsPrimaryInstance = true;
+            ownsMutex = true;
+            return true;
+        }
+
+        public void StartListening()
+        {
+            ThrowIfDisposed();
+
+            if (!IsPrimaryInstance || listenerTask is not null)
+            {
+                return;
+            }
+
+            cancellation = new CancellationTokenSource();
+            CancellationToken token = cancellation.Token;
+
+            listenerTask = Task.Run(
+                () => ListenForActivationAsync(token),
+                token
+            );
+        }
+
+        private async Task ListenForActivationAsync(
+            CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    using var server = new NamedPipeServerStream(
+                        activationPipeName,
+                        PipeDirection.InOut,
+                        maxNumberOfServerInstances: 1,
+                        PipeTransmissionMode.Byte,
+                        PipeOptions.Asynchronous
+                    );
+
+                    await server.WaitForConnectionAsync(token);
+
+                    using var reader = new StreamReader(
+                        server,
+                        Encoding.UTF8,
+                        detectEncodingFromByteOrderMarks: true,
+                        bufferSize: 1024,
+                        leaveOpen: true
+                    );
+
+                    using var writer = new StreamWriter(
+                        server,
+                        new UTF8Encoding(false),
+                        bufferSize: 1024,
+                        leaveOpen: true
+                    )
+                    {
+                        AutoFlush = true
+                    };
+
+                    string? request = await reader.ReadLineAsync(token);
+
+                    if (!string.Equals(
+                            request,
+                            ActivationRequest,
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        // The ACK is emitted only after the activation handler
+                        // returns. Program.cs uses Dispatcher.Invoke, so a hung
+                        // UI will not produce a false-positive ACK.
+                        ActivationRequested?.Invoke(this, EventArgs.Empty);
+                        await writer.WriteLineAsync(ActivationAck);
+                    }
+                    catch
+                    {
+                        // A failed activation is intentionally left without ACK;
+                        // the secondary instance can then attempt safe takeover.
+                    }
+                }
+                catch (OperationCanceledException) when (
+                    token.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (IOException) when (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(100, token);
+                }
+                catch (UnauthorizedAccessException) when (
+                    !token.IsCancellationRequested)
+                {
+                    await Task.Delay(250, token);
+                }
+            }
+        }
+
+        private static int NormalizeTimeout(TimeSpan timeout)
+        {
+            if (timeout <= TimeSpan.Zero)
+            {
+                return 1;
+            }
+
+            double milliseconds = timeout.TotalMilliseconds;
+
+            if (milliseconds >= int.MaxValue)
+            {
+                return int.MaxValue;
+            }
+
+            return Math.Max(1, (int)Math.Ceiling(milliseconds));
         }
 
         private static string NormalizeApplicationId(string applicationId)
@@ -123,92 +341,9 @@ namespace GeniaProxy.Services
             );
         }
 
-        public void StartListening()
-        {
-            ThrowIfDisposed();
-
-            if (!IsPrimaryInstance ||
-                activationEvent is null ||
-                listenerTask is not null)
-            {
-                return;
-            }
-
-            cancellation =
-                new CancellationTokenSource();
-
-            CancellationToken token =
-                cancellation.Token;
-
-            listenerTask = Task.Run(
-                () => ListenForActivation(token),
-                token
-            );
-        }
-
-        public void SignalPrimaryInstance()
-        {
-            ThrowIfDisposed();
-
-            if (IsPrimaryInstance)
-            {
-                return;
-            }
-
-            // Первый экземпляр может ещё запускаться,
-            // поэтому пробуем открыть событие несколько раз.
-            for (int attempt = 0; attempt < 10; attempt++)
-            {
-                try
-                {
-                    using EventWaitHandle existingEvent =
-                        EventWaitHandle.OpenExisting(
-                            activationEventName
-                        );
-
-                    existingEvent.Set();
-                    return;
-                }
-                catch (WaitHandleCannotBeOpenedException)
-                {
-                    Thread.Sleep(100);
-                }
-            }
-        }
-
-        private void ListenForActivation(
-            CancellationToken token)
-        {
-            while (!token.IsCancellationRequested)
-            {
-                activationEvent?.WaitOne();
-
-                if (token.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                try
-                {
-                    ActivationRequested?.Invoke(
-                        this,
-                        EventArgs.Empty
-                    );
-                }
-                catch
-                {
-                    // Ошибка обработчика не должна
-                    // завершать поток ожидания.
-                }
-            }
-        }
-
         private void ThrowIfDisposed()
         {
-            ObjectDisposedException.ThrowIf(
-                disposed,
-                this
-            );
+            ObjectDisposedException.ThrowIf(disposed, this);
         }
 
         public void Dispose()
@@ -219,29 +354,20 @@ namespace GeniaProxy.Services
             }
 
             disposed = true;
-
             cancellation?.Cancel();
-
-            if (IsPrimaryInstance)
-            {
-                activationEvent?.Set();
-            }
 
             try
             {
-                listenerTask?.Wait(
-                    TimeSpan.FromMilliseconds(500)
-                );
+                listenerTask?.Wait(TimeSpan.FromMilliseconds(750));
             }
             catch
             {
-                // Приложение уже завершается.
+                // Application is shutting down; diagnostics must not block exit.
             }
 
-            activationEvent?.Dispose();
             cancellation?.Dispose();
 
-            if (IsPrimaryInstance)
+            if (ownsMutex)
             {
                 try
                 {
@@ -249,7 +375,7 @@ namespace GeniaProxy.Services
                 }
                 catch (ApplicationException)
                 {
-                    // Mutex уже не принадлежит потоку.
+                    // Mutex is no longer owned by this thread.
                 }
             }
 

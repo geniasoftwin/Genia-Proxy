@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Genia Proxy Switcher Direct",
-  "version": "5.6.0.6",
+  "version": "5.6.0.7",
   "description": "Privacy-focused SOCKS5/TUN switcher with independent Direct Bridge/TUN lanes and a kill-switch-safe loopback bridge bootstrap and fail-closed TUN session fencing.",
   "permissions": [
     "proxy",

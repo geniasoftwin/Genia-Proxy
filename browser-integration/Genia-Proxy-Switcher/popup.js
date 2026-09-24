@@ -8,7 +8,7 @@ const DEFAULT_STATE = Object.freeze({
   port: 2080,
   profileName: "GeniaProxy / NekoBox / Hysteria / VLESS",
   strictLocal: true,
-  trustedExitIps: [],
+  trustedExitIps: ["83.147.232.178", "46.8.182.247"],
   expectedExitIp: null,
   webRtcShieldEnabled: true,
   webRtcCompatibility: false,
@@ -622,7 +622,7 @@ function renderAudit(state) {
   const summary = state.routeStatsSummary || {};
   const lines = [];
   for (const ip of trusted) {
-    const meta = "";
+    const meta = ip === "83.147.232.178" ? "NL/AMS" : ip === "46.8.182.247" ? "DE/FRA" : "";
     const d7 = summary.days7?.[ip];
     const d30 = summary.days30?.[ip];
     if (!d7 && !d30) continue;

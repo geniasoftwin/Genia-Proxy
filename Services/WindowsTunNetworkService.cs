@@ -337,6 +337,15 @@ namespace GeniaProxy.Services
                     cancellationToken
                 );
 
+                // RC3 TIMING-AB experiment only. Mode A preserves the RC3
+                // behavior. Mode B inserts one controlled 150 ms barrier
+                // immediately before the primary direct UDP DNS readiness
+                // probe. No retry, timeout, route, DNS or acceptance logic
+                // is changed by this experiment.
+                await TimingAbExperiment.ApplyBeforeDirectDnsBarrierAsync(
+                    cancellationToken
+                );
+
                 IPAddress resolvedAddress = await VerifyDirectDnsOverTunAsync(
                     cancellationToken
                 );

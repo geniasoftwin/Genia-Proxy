@@ -1,0 +1,49 @@
+﻿GeniaProxy 4.5.0 Alpha 1 EXP1 — State Machine & Session Journal
+
+BASELINE
+- Derived from GeniaProxy 4.4.0 Final Stable Direct Bridge.
+- Frozen 4.4.0 networking/TUN/DNS/core algorithms are not modified.
+
+ALPHA 1 EXP1
+- Adds explicit control-plane lifecycle state machine.
+- Adds unique session IDs and session-scoped verification.
+- Adds structured append-only JSONL diagnostics journal.
+- Adds read-only control-plane diagnostics snapshot.
+- Integrates existing Manager channel test with verified state.
+
+NOT IN EXP1
+- Authenticated Direct Bridge.
+- Manager Route Coherence v2 enforcement.
+- Browser/Manager authenticated session binding.
+- AnyTLS, TUIC, Snell, Whitelist Mode or experimental Xray protocol work.
+
+
+EXP1 FIX1
+- JSONL journal no longer keeps an exclusive-compatible writer handle open for the full session.
+- Each event is appended, flushed and the handle is released immediately.
+- Live diagnostics/tests can read or copy session-journal.jsonl while GeniaProxy remains connected.
+- ControlPlane analyzer cleanup: state-machine semaphore disposal and EventArgs contract.
+
+
+EXP1 FIX2
+- Adds automatic TUN control-plane exit verification after network-ready using the existing ConnectionTestService in diagnostic mode.
+- Adds sessionId guards to verification-start/success/failure updates; stale results from an older session are ignored.
+- Direct Bridge current-route verification no longer reads LastExitIp/LastTestUtc from profile history.
+- Frozen ConnectionSession, WindowsTunNetworkService, ConnectionTestService, CoreManager, Xray and Wintun remain unchanged.
+
+EXP1 FIX3
+- Idempotent current-session verification refresh; successful repeated probes update evidence/TTL without an illegal state transition.
+- Structured `verificationRefreshed` journal event plus stale-session refresh guard.
+- TUN-aware Browser Switcher WebRTC audit semantics; local extension-origin ICE is informational when no public ICE is exposed.
+- Transient Manager route metadata is cleared on Direct Bridge/Manager loss while Hard Kill Switch remains fail-closed.
+- Frozen 4.4.0 network algorithms remain unchanged.
+
+EXP1 FIX4
+- Adds startup-journal.jsonl before MainWindow creation for startup/elevation/single-instance/recovery diagnostics.
+- Replaces fire-and-forget second-instance activation with acknowledged local named-pipe activation.
+- If activation is not acknowledged, a secondary instance waits for safe mutex takeover instead of silently exiting.
+- If the old process is still alive/unresponsive, GeniaProxy shows an explicit warning instead of terminating invisibly.
+- Elevated handoff now has an explicit 30-second primary-exit gate and a visible failure path.
+- Pending TUN recovery is checked before UI startup; ADMIN launches restore the existing snapshot before MainWindow when possible.
+- Adds a code-level Protocol Lab boundary: AnyTLS, TUIC, Snell, Whitelist Mode and Xray experimental capabilities are registered but disabled-by-default for Alpha 1.
+- Frozen TUN/DNS/core algorithms remain unchanged.

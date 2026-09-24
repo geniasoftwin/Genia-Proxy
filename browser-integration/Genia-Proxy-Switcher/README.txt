@@ -2,7 +2,7 @@ GENIA PROXY SWITCHER DIRECT 5.6.0 STABLE
 ========================================
 
 Stable Direct Bridge browser integration for GeniaProxy 4.4.0 Final Stable.
-Manifest build: 5.6.0.6.
+Manifest build: 5.6.0.7.
 
 Validated behavior
 ------------------

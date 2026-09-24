@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
+using GeniaProxy.ControlPlane;
 using GeniaProxy.Models;
 using GeniaProxy.Services;
 
@@ -43,7 +44,16 @@ namespace GeniaProxy.Tests
                 ("Отклонение инъекции в TUN snapshot", RejectMaliciousTunSnapshot),
                 ("Отклонение чужой TUN topology", RejectUnexpectedTunSnapshotTopology),
                 ("Разбор проверки канала", ParseConnectionTrace),
-                ("Отчёт privacy probe", FormatPrivacyReport)
+                ("Отчёт privacy probe", FormatPrivacyReport),
+                ("Control Plane lifecycle", ValidateControlPlaneLifecycle),
+                ("Control Plane session isolation", ValidateControlPlaneSessionIsolation),
+                ("Control Plane stale session guard", ValidateControlPlaneStaleSessionGuard),
+                ("Control Plane verification refresh", ValidateControlPlaneVerificationRefresh),
+                ("Control Plane refresh stale-session guard", ValidateControlPlaneRefreshStaleSessionGuard),
+                ("Control Plane transition guard", ValidateControlPlaneTransitionGuard),
+                ("Startup journal live-readable", ValidateStartupJournalLiveReadable),
+                ("Single-instance activation ACK", ValidateSingleInstanceActivationAck),
+                ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary)
             ];
 
             int failed = 0;
@@ -179,7 +189,7 @@ namespace GeniaProxy.Tests
         private static void ValidateBrowserIntegrationMetadata()
         {
             AssertEqual("5.6.0", BrowserIntegrationService.SwitcherVersion);
-            AssertEqual("5.6.0.6", BrowserIntegrationService.SwitcherManifestVersion);
+            AssertEqual("5.6.0.7", BrowserIntegrationService.SwitcherManifestVersion);
             AssertEqual("direct-1-exp2", BrowserIntegrationService.BridgeVersion);
             AssertEqual(47831, BrowserDirectBridgeService.Port);
             AssertEqual(1, BrowserDirectBridgeService.ProtocolVersion);
@@ -1577,6 +1587,573 @@ namespace GeniaProxy.Tests
                     StringComparison.Ordinal
                 )
             );
+        }
+
+        private static void ValidateControlPlaneLifecycle()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath,
+                    TimeSpan.FromMinutes(5)
+                );
+
+                coordinator.BeginSessionAsync(
+                    "alpha-profile",
+                    "tun"
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(
+                    ConnectionState.Connecting,
+                    coordinator.Snapshot.State
+                );
+
+                coordinator.MarkNetworkReadyAsync(
+                    "xray",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(
+                    ConnectionState.TunWarmup,
+                    coordinator.Snapshot.State
+                );
+
+                coordinator.MarkVerificationStartedAsync(
+                    "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                coordinator.MarkVerifiedAsync(
+                    "203.0.113.10",
+                    expectedExit: null,
+                    source: "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                ControlPlaneSnapshot verified = coordinator.Snapshot;
+                AssertEqual(ConnectionState.Verified, verified.State);
+                AssertEqual("203.0.113.10", verified.VerifiedExit);
+                AssertEqual(true, verified.VerificationSucceeded);
+                AssertEqual(true, verified.VerificationFresh);
+
+                coordinator.BeginDisconnectAsync(
+                    "test-disconnect"
+                ).GetAwaiter().GetResult();
+                coordinator.CompleteDisconnectAsync(
+                    "test-disconnect-complete"
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(
+                    ConnectionState.Idle,
+                    coordinator.Snapshot.State
+                );
+
+                string journal = File.ReadAllText(journalPath);
+                AssertEqual(
+                    true,
+                    journal.Contains(
+                        "sessionStarted",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+                AssertEqual(
+                    true,
+                    journal.Contains(
+                        "verificationSucceeded",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+                AssertEqual(
+                    true,
+                    journal.Contains(
+                        "sessionStopped",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneSessionIsolation()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath
+                );
+
+                coordinator.BeginSessionAsync(
+                    "profile-one",
+                    "local"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "local",
+                    tunMode: false
+                ).GetAwaiter().GetResult();
+                coordinator.MarkVerifiedAsync(
+                    "198.51.100.20",
+                    expectedExit: null,
+                    source: "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                Guid firstSession = coordinator.Snapshot.SessionId;
+
+                coordinator.CompleteDisconnectAsync(
+                    "first-session-complete"
+                ).GetAwaiter().GetResult();
+
+                coordinator.BeginSessionAsync(
+                    "profile-two",
+                    "local"
+                ).GetAwaiter().GetResult();
+
+                ControlPlaneSnapshot second = coordinator.Snapshot;
+                AssertEqual(false, firstSession == second.SessionId);
+                AssertEqual<string?>(null, second.VerifiedExit);
+                AssertEqual<DateTimeOffset?>(null, second.VerifiedAtUtc);
+                AssertEqual<bool?>(null, second.VerificationSucceeded);
+                AssertEqual(false, second.VerificationFresh);
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneStaleSessionGuard()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath
+                );
+
+                coordinator.BeginSessionAsync(
+                    "old-session",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+
+                Guid staleSessionId = coordinator.Snapshot.SessionId;
+
+                coordinator.BeginSessionAsync(
+                    "new-session",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+
+                Guid currentSessionId = coordinator.Snapshot.SessionId;
+                AssertEqual(false, staleSessionId == currentSessionId);
+
+                bool staleStarted = coordinator
+                    .MarkVerificationStartedAsync(
+                        staleSessionId,
+                        "manager-tun-auto"
+                    ).GetAwaiter().GetResult();
+                bool staleApplied = coordinator
+                    .MarkVerifiedAsync(
+                        staleSessionId,
+                        "192.0.2.90",
+                        expectedExit: null,
+                        source: "manager-tun-auto"
+                    ).GetAwaiter().GetResult();
+
+                AssertEqual(false, staleStarted);
+                AssertEqual(false, staleApplied);
+                AssertEqual(
+                    ConnectionState.TunWarmup,
+                    coordinator.Snapshot.State
+                );
+                AssertEqual<string?>(
+                    null,
+                    coordinator.Snapshot.VerifiedExit
+                );
+
+                bool currentStarted = coordinator
+                    .MarkVerificationStartedAsync(
+                        currentSessionId,
+                        "manager-tun-auto"
+                    ).GetAwaiter().GetResult();
+                bool currentApplied = coordinator
+                    .MarkVerifiedAsync(
+                        currentSessionId,
+                        "198.51.100.77",
+                        expectedExit: null,
+                        source: "manager-tun-auto"
+                    ).GetAwaiter().GetResult();
+
+                AssertEqual(true, currentStarted);
+                AssertEqual(true, currentApplied);
+                AssertEqual(
+                    ConnectionState.Verified,
+                    coordinator.Snapshot.State
+                );
+                AssertEqual(
+                    "198.51.100.77",
+                    coordinator.Snapshot.VerifiedExit
+                );
+                AssertEqual(
+                    "manager-tun-auto",
+                    coordinator.Snapshot.VerificationSource
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneVerificationRefresh()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath,
+                    TimeSpan.FromMinutes(5)
+                );
+
+                coordinator.BeginSessionAsync(
+                    "refresh-profile",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+
+                Guid sessionId = coordinator.Snapshot.SessionId;
+                bool automaticApplied = coordinator.MarkVerifiedAsync(
+                    sessionId,
+                    "198.51.100.77",
+                    expectedExit: null,
+                    source: "manager-tun-auto"
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(true, automaticApplied);
+                ControlPlaneSnapshot automatic = coordinator.Snapshot;
+                AssertEqual(ConnectionState.Verified, automatic.State);
+                DateTimeOffset verifiedStateSince = automatic.StateSinceUtc;
+                DateTimeOffset firstVerifiedAt = automatic.VerifiedAtUtc!.Value;
+
+                Thread.Sleep(10);
+
+                bool started = coordinator.MarkVerificationStartedAsync(
+                    sessionId,
+                    "manager-channel-test"
+                ).GetAwaiter().GetResult();
+                bool refreshed = coordinator.MarkVerifiedAsync(
+                    sessionId,
+                    "198.51.100.88",
+                    expectedExit: null,
+                    source: "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                ControlPlaneSnapshot snapshot = coordinator.Snapshot;
+                AssertEqual(true, started);
+                AssertEqual(true, refreshed);
+                AssertEqual(sessionId, snapshot.SessionId);
+                AssertEqual(ConnectionState.Verified, snapshot.State);
+                AssertEqual(verifiedStateSince, snapshot.StateSinceUtc);
+                AssertEqual("198.51.100.88", snapshot.VerifiedExit);
+                AssertEqual("manager-channel-test", snapshot.VerificationSource);
+                AssertEqual(true, snapshot.VerifiedAtUtc > firstVerifiedAt);
+                AssertEqual(true, snapshot.VerificationFresh);
+
+                string journal = File.ReadAllText(journalPath);
+                AssertEqual(
+                    true,
+                    journal.Contains(
+                        "verificationRefreshed",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneRefreshStaleSessionGuard()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(journalPath);
+
+                coordinator.BeginSessionAsync(
+                    "old-refresh-session",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+                Guid staleSessionId = coordinator.Snapshot.SessionId;
+                coordinator.MarkVerifiedAsync(
+                    staleSessionId,
+                    "192.0.2.10",
+                    expectedExit: null,
+                    source: "manager-tun-auto"
+                ).GetAwaiter().GetResult();
+
+                coordinator.BeginSessionAsync(
+                    "new-refresh-session",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+                Guid currentSessionId = coordinator.Snapshot.SessionId;
+                coordinator.MarkVerifiedAsync(
+                    currentSessionId,
+                    "198.51.100.40",
+                    expectedExit: null,
+                    source: "manager-tun-auto"
+                ).GetAwaiter().GetResult();
+
+                DateTimeOffset? currentVerifiedAt = coordinator.Snapshot.VerifiedAtUtc;
+                bool staleRefresh = coordinator.MarkVerifiedAsync(
+                    staleSessionId,
+                    "203.0.113.99",
+                    expectedExit: null,
+                    source: "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(false, staleRefresh);
+                AssertEqual(currentSessionId, coordinator.Snapshot.SessionId);
+                AssertEqual("198.51.100.40", coordinator.Snapshot.VerifiedExit);
+                AssertEqual(currentVerifiedAt, coordinator.Snapshot.VerifiedAtUtc);
+                AssertEqual("manager-tun-auto", coordinator.Snapshot.VerificationSource);
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneTransitionGuard()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath
+                );
+
+                coordinator.BeginSessionAsync(
+                    "guard-profile",
+                    "local"
+                ).GetAwaiter().GetResult();
+
+                AssertThrows<InvalidOperationException>(() =>
+                    coordinator.MarkVerifiedAsync(
+                        "192.0.2.44",
+                        expectedExit: null,
+                        source: "invalid-early-verification"
+                    ).GetAwaiter().GetResult()
+                );
+
+                AssertEqual(
+                    ConnectionState.Connecting,
+                    coordinator.Snapshot.State
+                );
+                AssertEqual<string?>(
+                    null,
+                    coordinator.Snapshot.VerifiedExit
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+
+        private static void ValidateStartupJournalLiveReadable()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "startup-journal.jsonl"
+            );
+
+            try
+            {
+                var journal = new StartupJournal(journalPath);
+                Guid attemptId = Guid.NewGuid();
+
+                AssertEqual(
+                    true,
+                    journal.TryAppend(
+                        "startup.test",
+                        attemptId,
+                        new Dictionary<string, object?>
+                        {
+                            ["phase"] = "unit"
+                        }
+                    )
+                );
+
+                using FileStream reader = new(
+                    journalPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete
+                );
+
+                AssertEqual(
+                    true,
+                    journal.TryAppend(
+                        "startup.test.second",
+                        attemptId
+                    )
+                );
+
+                reader.Position = 0;
+                using var textReader = new StreamReader(
+                    reader,
+                    Encoding.UTF8,
+                    detectEncodingFromByteOrderMarks: true,
+                    bufferSize: 1024,
+                    leaveOpen: true
+                );
+
+                string content = textReader.ReadToEnd();
+
+                AssertEqual(
+                    true,
+                    content.Contains(
+                        "startup.test",
+                        StringComparison.Ordinal
+                    )
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateSingleInstanceActivationAck()
+        {
+            string applicationId =
+                "GeniaProxy.Tests." + Guid.NewGuid().ToString("N");
+
+            using var primary = new SingleInstanceService(applicationId);
+
+            AssertEqual(true, primary.IsPrimaryInstance);
+
+            using var activated = new ManualResetEventSlim(false);
+
+            primary.ActivationRequested +=
+                (_, _) => activated.Set();
+
+            primary.StartListening();
+
+            Thread.Sleep(100);
+
+            using var secondary = new SingleInstanceService(applicationId);
+
+            AssertEqual(false, secondary.IsPrimaryInstance);
+
+            bool acknowledged = secondary.TryActivatePrimary(
+                TimeSpan.FromSeconds(2),
+                out string? errorMessage
+            );
+
+            AssertEqual(true, acknowledged);
+            AssertEqual<string?>(null, errorMessage);
+            AssertEqual(
+                true,
+                activated.Wait(TimeSpan.FromSeconds(2))
+            );
+        }
+
+        private static void ValidateProtocolLabBoundary()
+        {
+            ProtocolLabFeatureCatalog.ThrowIfAlpha1BoundaryViolated();
+
+            AssertEqual(
+                true,
+                ProtocolLabFeatureCatalog.Alpha1BoundaryIsSafe
+            );
+
+            string[] required =
+            [
+                "anytls",
+                "tuic",
+                "snell",
+                "whitelist-mode",
+                "xray-experimental"
+            ];
+
+            foreach (string id in required)
+            {
+                FeatureCapability? capability =
+                    ProtocolLabFeatureCatalog.All
+                        .FirstOrDefault(item =>
+                            item.Id.Equals(
+                                id,
+                                StringComparison.Ordinal
+                            ));
+
+                AssertNotNull(capability);
+                AssertEqual(
+                    FeatureLane.ProtocolLab,
+                    capability!.Lane
+                );
+                AssertEqual(false, capability.EnabledByDefault);
+            }
         }
 
         private static string CreateTestDirectory()
