@@ -180,11 +180,10 @@ $allDirectories = Get-ChildItem -LiteralPath $root -Recurse -Directory -Force
 
 foreach ($directory in $allDirectories) {
     $relativeDirectory = Get-RelativePathCompat $directory.FullName
-    $normalizedDirectory = $relativeDirectory -replace '/', '\'
 
     if (
-        $normalizedDirectory -match '(?i)(^|\)data\profiles($|\)' -or
-        $normalizedDirectory -match '(?i)(^|\)profiles($|\)'
+        $relativeDirectory -match '(?i)(^|[\\/])data[\\/]profiles($|[\\/])' -or
+        $relativeDirectory -match '(?i)(^|[\\/])profiles($|[\\/])'
     ) {
         Add-Finding -File $relativeDirectory -Line "-" -Rule "Runtime profile directory must not be published"
     }
