@@ -66,6 +66,7 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary),
                 ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel),
                 ("Protocol Lab AnyTLS selection gate", ValidateProtocolLabAnyTlsSelectionGate),
+                ("Protocol Lab TUIC selection gate", ValidateProtocolLabTuicSelectionGate),
                 ("Protocol Lab AnyTLS config", ValidateProtocolLabAnyTlsConfig),
                 ("Protocol Lab AnyTLS validation", ValidateProtocolLabAnyTlsValidation),
                 ("Protocol Lab AnyTLS trusted certificate", ValidateProtocolLabAnyTlsTrustedCertificate),
@@ -2494,8 +2495,42 @@ namespace GeniaProxy.Tests
             AssertEqual(true, capability.SelectableInProtocolLab);
 
             AssertThrows<NotSupportedException>(() =>
-                ProtocolLabFeatureCatalog.RequireSelectable("tuic")
+                ProtocolLabFeatureCatalog.RequireSelectable("snell")
             );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "whitelist-mode"
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "xray-experimental"
+                )
+            );
+        }
+
+        private static void ValidateProtocolLabTuicSelectionGate()
+        {
+            FeatureCapability capability =
+                ProtocolLabFeatureCatalog.RequireSelectable("TUIC");
+
+            AssertEqual("tuic", capability.Id);
+            AssertEqual(
+                FeatureLane.ProtocolLab,
+                capability.Lane
+            );
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                capability.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.RuntimeVerified,
+                capability.SupportState
+            );
+            AssertEqual(false, capability.EnabledByDefault);
+            AssertEqual(true, capability.SelectableInProtocolLab);
 
             AssertThrows<NotSupportedException>(() =>
                 ProtocolLabFeatureCatalog.RequireSelectable("snell")
