@@ -66,7 +66,8 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary),
                 ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel),
                 ("Protocol Lab AnyTLS config", ValidateProtocolLabAnyTlsConfig),
-                ("Protocol Lab AnyTLS validation", ValidateProtocolLabAnyTlsValidation)
+                ("Protocol Lab AnyTLS validation", ValidateProtocolLabAnyTlsValidation),
+                ("Protocol Lab AnyTLS trusted certificate", ValidateProtocolLabAnyTlsTrustedCertificate)
             ];
 
             int failed = 0;
@@ -106,32 +107,65 @@ namespace GeniaProxy.Tests
                 return false;
             }
 
-            if (args.Length != 2 ||
-                !args[0].Equals(
-                    "--write-anytls-config",
-                    StringComparison.Ordinal))
-            {
-                Console.Error.WriteLine(
-                    "Неизвестный режим тестового probe."
-                );
-                exitCode = 2;
-                return true;
-            }
-
             try
             {
-                string json =
-                    ProtocolLabAnyTlsConfigService
-                        .CreateLocalProxyConfig(
-                            "example.com",
-                            443,
-                            "protocol-lab-test",
-                            "example.com",
-                            2080
+                string json;
+                string outputPath;
+
+                if (args.Length == 2 &&
+                    args[0].Equals(
+                        "--write-anytls-config",
+                        StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+                    json =
+                        ProtocolLabAnyTlsConfigService
+                            .CreateLocalProxyConfig(
+                                "example.com",
+                                443,
+                                "protocol-lab-test",
+                                "example.com",
+                                2080
+                            );
+                }
+                else if (args.Length == 5 &&
+                         args[0].Equals(
+                             "--write-anytls-runtime-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int serverPort) ||
+                        !int.TryParse(args[3], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Runtime probe ports must be integers."
                         );
+                    }
+
+                    json =
+                        ProtocolLabAnyTlsConfigService
+                            .CreateLocalProxyConfig(
+                                "127.0.0.1",
+                                serverPort,
+                                "protocol-lab-loopback-secret",
+                                "localhost",
+                                localPort,
+                                allowInsecureTls: false,
+                                trustedCertificatePath: args[4]
+                            );
+                }
+                else
+                {
+                    Console.Error.WriteLine(
+                        "Неизвестный режим тестового probe."
+                    );
+                    exitCode = 2;
+                    return true;
+                }
 
                 File.WriteAllText(
-                    args[1],
+                    outputPath,
                     json,
                     new UTF8Encoding(
                         encoderShouldEmitUTF8Identifier: false
@@ -140,7 +174,7 @@ namespace GeniaProxy.Tests
 
                 Console.WriteLine(
                     "Protocol Lab AnyTLS config written: " +
-                    Path.GetFullPath(args[1])
+                    Path.GetFullPath(outputPath)
                 );
 
                 return true;
@@ -2540,6 +2574,49 @@ namespace GeniaProxy.Tests
                 true,
                 insecureRoot["outbounds"]?[0]?["tls"]?
                     ["insecure"]?.GetValue<bool>()
+            );
+        }
+
+        private static void ValidateProtocolLabAnyTlsTrustedCertificate()
+        {
+            string json =
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "127.0.0.1",
+                    4443,
+                    "secret",
+                    "localhost",
+                    2080,
+                    allowInsecureTls: false,
+                    trustedCertificatePath:
+                        @"C:\ProtocolLab\loopback-cert.pem"
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)!.AsObject();
+
+            AssertEqual(
+                false,
+                root["outbounds"]?[0]?["tls"]?
+                    ["insecure"]?.GetValue<bool>()
+            );
+
+            AssertEqual(
+                @"C:\ProtocolLab\loopback-cert.pem",
+                root["outbounds"]?[0]?["tls"]?
+                    ["certificate_path"]?.GetValue<string>()
+            );
+
+            AssertThrows<FormatException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "127.0.0.1",
+                    4443,
+                    "secret",
+                    "localhost",
+                    2080,
+                    allowInsecureTls: false,
+                    trustedCertificatePath:
+                        "C:\\ProtocolLab\\bad\ncert.pem"
+                )
             );
         }
 
