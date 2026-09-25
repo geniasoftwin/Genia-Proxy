@@ -13,8 +13,13 @@ namespace GeniaProxy.Tests
 {
     internal static class Program
     {
-        private static int Main()
+        private static int Main(string[] args)
         {
+            if (TryRunProtocolLabProbe(args, out int probeExitCode))
+            {
+                return probeExitCode;
+            }
+
             (string Name, Action Test)[] tests =
             [
                 ("Импорт Hysteria2", CreateHysteria2Config),
@@ -88,6 +93,64 @@ namespace GeniaProxy.Tests
             );
 
             return failed == 0 ? 0 : 1;
+        }
+
+        private static bool TryRunProtocolLabProbe(
+            string[] args,
+            out int exitCode)
+        {
+            exitCode = 0;
+
+            if (args.Length == 0)
+            {
+                return false;
+            }
+
+            if (args.Length != 2 ||
+                !args[0].Equals(
+                    "--write-anytls-config",
+                    StringComparison.Ordinal))
+            {
+                Console.Error.WriteLine(
+                    "Неизвестный режим тестового probe."
+                );
+                exitCode = 2;
+                return true;
+            }
+
+            try
+            {
+                string json =
+                    ProtocolLabAnyTlsConfigService
+                        .CreateLocalProxyConfig(
+                            "example.com",
+                            443,
+                            "protocol-lab-test",
+                            "example.com",
+                            2080
+                        );
+
+                File.WriteAllText(
+                    args[1],
+                    json,
+                    new UTF8Encoding(
+                        encoderShouldEmitUTF8Identifier: false
+                    )
+                );
+
+                Console.WriteLine(
+                    "Protocol Lab AnyTLS config written: " +
+                    Path.GetFullPath(args[1])
+                );
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                exitCode = 1;
+                return true;
+            }
         }
 
         private static void CreateHysteria2Config()
