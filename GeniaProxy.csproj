@@ -14,10 +14,10 @@
 		<AssemblyName>GeniaProxy</AssemblyName>
 		<Product>GeniaProxy</Product>
 		<Version>4.5.0</Version>
-		<FileVersion>4.5.0.11</FileVersion>
+		<FileVersion>4.5.0.12</FileVersion>
 		<AssemblyVersion>4.5.0.0</AssemblyVersion>
 		<Authors>Genia</Authors>
-		<Description>GeniaProxy 4.5.0 Alpha 1 RC3 TIMING-AB - controlled A/B readiness experiment over Xray 26.3.27 + sing-box 1.14.1.</Description>
+		<Description>GeniaProxy 4.5.0 Alpha 2 Protocol Lab - isolated AnyTLS, TUIC and Snell v6 validation over Xray 26.3.27 + sing-box 1.14.1.</Description>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -51,6 +51,9 @@
 		<None Remove="README-4.5.0-A1-EXP1.md" />
 		<None Remove="RELEASE-4.5.0-A1-EXP1.txt" />
 		<None Remove="PROTOCOL-LAB-BOUNDARY.md" />
+		<None Remove="PROTOCOL-LAB-ALPHA2-STATUS.md" />
+		<None Remove="PROTOCOL-LAB-WHITELIST-BOUNDARY.md" />
+		<None Remove="PROTOCOL-LAB-XRAY-EXPERIMENTAL-BOUNDARY.md" />
 		<None Remove="ENGINE-REFRESH-RC1.md" />
 		<None Remove="ENGINE-REFRESH-RC3.md" />
 		<None Remove="RC3-TIMING-AB.md" />
@@ -191,6 +194,21 @@
 		</Content>
 
 		<Content Include="PROTOCOL-LAB-BOUNDARY.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="PROTOCOL-LAB-ALPHA2-STATUS.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="PROTOCOL-LAB-WHITELIST-BOUNDARY.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="PROTOCOL-LAB-XRAY-EXPERIMENTAL-BOUNDARY.md">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</Content>
