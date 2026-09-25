@@ -100,6 +100,9 @@ namespace GeniaProxy
             connectionSession.UnexpectedExit +=
                 ConnectionSession_UnexpectedExit;
 
+            ProtocolLabSelectionAudit.SelectionLogged +=
+                ProtocolLabSelectionAudit_SelectionLogged;
+
             sessionTimer.Tick += (_, _) =>
                 UpdateSessionTime();
         }
@@ -2820,6 +2823,20 @@ namespace GeniaProxy
                 settings.TunStackPreference;
         }
 
+        private void ProtocolLabSelectionAudit_SelectionLogged(
+            string message)
+        {
+            if (Dispatcher.CheckAccess())
+            {
+                AddLog(message);
+                return;
+            }
+
+            _ = Dispatcher.BeginInvoke(
+                new Action(() => AddLog(message))
+            );
+        }
+
         private void ShowWarning(string message)
         {
             System.Windows.MessageBox.Show(
@@ -2895,7 +2912,7 @@ namespace GeniaProxy
                 {
                     closeInProgress = false;
                     SetOperationUi(isBusy: false);
-                    Title = $"GeniaProxy 4.5.0 Alpha 1 RC3 TIMING-AB [{TimingAbExperiment.Mode}]";
+                    Title = $"GeniaProxy 4.5.0 Alpha 2 Protocol Lab [{TimingAbExperiment.Mode}]";
                     return;
                 }
             }
@@ -3171,6 +3188,8 @@ namespace GeniaProxy
                 ConnectionSession_StateChanged;
             connectionSession.UnexpectedExit -=
                 ConnectionSession_UnexpectedExit;
+            ProtocolLabSelectionAudit.SelectionLogged -=
+                ProtocolLabSelectionAudit_SelectionLogged;
             browserDirectBridgeService.Dispose();
             try
             {
