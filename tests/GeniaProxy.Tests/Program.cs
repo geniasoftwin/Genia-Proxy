@@ -71,7 +71,9 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab AnyTLS validation", ValidateProtocolLabAnyTlsValidation),
                 ("Protocol Lab AnyTLS trusted certificate", ValidateProtocolLabAnyTlsTrustedCertificate),
                 ("Protocol Lab TUIC config", ValidateProtocolLabTuicConfig),
-                ("Protocol Lab TUIC validation", ValidateProtocolLabTuicValidation)
+                ("Protocol Lab TUIC validation", ValidateProtocolLabTuicValidation),
+                ("Protocol Lab Snell v6 config", ValidateProtocolLabSnellConfig),
+                ("Protocol Lab Snell v6 validation", ValidateProtocolLabSnellValidation)
             ];
 
             int failed = 0;
@@ -203,6 +205,22 @@ namespace GeniaProxy.Tests
                                 localPort,
                                 allowInsecureTls: false,
                                 trustedCertificatePath: args[4]
+                            );
+                }
+                else if (args.Length == 2 &&
+                         args[0].Equals(
+                             "--write-snell-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    json =
+                        ProtocolLabSnellConfigService
+                            .CreateLocalProxyConfig(
+                                "example.com",
+                                443,
+                                "protocol-lab-snell-psk",
+                                2080
                             );
                 }
                 else
@@ -2889,6 +2907,139 @@ namespace GeniaProxy.Tests
                 @"C:\ProtocolLab\tuic-cert.pem",
                 root["outbounds"]?[0]?["tls"]?
                     ["certificate_path"]?.GetValue<string>()
+            );
+        }
+
+        private static void ValidateProtocolLabSnellConfig()
+        {
+            string json =
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "123456789012",
+                    2080
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)?.AsObject()
+                ?? throw new Exception(
+                    "Не создан Snell JSON."
+                );
+
+            JsonObject outbound =
+                root["outbounds"]?[0]?.AsObject()
+                ?? throw new Exception(
+                    "Не создан Snell outbound."
+                );
+
+            AssertEqual(
+                "snell",
+                outbound["type"]?.GetValue<string>()
+            );
+            AssertEqual(
+                6,
+                outbound["version"]?.GetValue<int>()
+            );
+            AssertEqual(
+                "edge.example.com",
+                outbound["server"]?.GetValue<string>()
+            );
+            AssertEqual(
+                443,
+                outbound["server_port"]?.GetValue<int>()
+            );
+            AssertEqual(
+                "123456789012",
+                outbound["psk"]?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound["reuse"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "default",
+                outbound["mode"]?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound.ContainsKey("network")
+            );
+            AssertEqual(
+                false,
+                outbound.ContainsKey("userkey")
+            );
+        }
+
+        private static void ValidateProtocolLabSnellValidation()
+        {
+            AssertThrows<FormatException>(() =>
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "short",
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentOutOfRangeException>(() =>
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    0,
+                    "123456789012",
+                    2080
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "123456789012",
+                    2080,
+                    mode: "invalid"
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "123456789012",
+                    2080,
+                    network: "icmp"
+                )
+            );
+
+            string json =
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "127.0.0.1",
+                    8443,
+                    "123456789012",
+                    2080,
+                    mode: "unshaped",
+                    network: "tcp",
+                    reuse: true,
+                    userKey: "lab-user-key"
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)!.AsObject();
+
+            AssertEqual(
+                "unshaped",
+                root["outbounds"]?[0]?["mode"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "tcp",
+                root["outbounds"]?[0]?["network"]?.GetValue<string>()
+            );
+            AssertEqual(
+                true,
+                root["outbounds"]?[0]?["reuse"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "lab-user-key",
+                root["outbounds"]?[0]?["userkey"]?.GetValue<string>()
             );
         }
 
