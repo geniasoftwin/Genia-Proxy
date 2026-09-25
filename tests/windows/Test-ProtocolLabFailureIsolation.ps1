@@ -36,6 +36,17 @@ function Get-FreeTcpPort {
     }
 }
 
+$UsedTcpPorts = [System.Collections.Generic.HashSet[int]]::new()
+
+function Get-UniqueTcpPort {
+    do {
+        $port = Get-UniqueTcpPort
+    }
+    while (-not $UsedTcpPorts.Add($port))
+
+    return $port
+}
+
 function Get-FreeUdpPort {
     $client = [System.Net.Sockets.UdpClient]::new(0)
 
@@ -189,14 +200,14 @@ function Invoke-ExpectedProxyFailure {
     }
 }
 
-$StableSingBoxPort = Get-FreeTcpPort
-$StableXrayPort = Get-FreeTcpPort
-$AnyTlsProxyPort = Get-FreeTcpPort
-$TuicProxyPort = Get-FreeTcpPort
-$SnellProxyPort = Get-FreeTcpPort
-$AnyTlsServerPort = Get-FreeTcpPort
+$StableSingBoxPort = Get-UniqueTcpPort
+$StableXrayPort = Get-UniqueTcpPort
+$AnyTlsProxyPort = Get-UniqueTcpPort
+$TuicProxyPort = Get-UniqueTcpPort
+$SnellProxyPort = Get-UniqueTcpPort
+$AnyTlsServerPort = Get-UniqueTcpPort
 $TuicServerPort = Get-FreeUdpPort
-$SnellServerPort = Get-FreeTcpPort
+$SnellServerPort = Get-UniqueTcpPort
 
 $TempDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("GeniaProxy-ProtocolLab-FailureIsolation-" + [Guid]::NewGuid().ToString("N"))
 $StableSingBoxConfig = Join-Path $TempDirectory "stable-singbox.json"
