@@ -35,6 +35,8 @@ namespace GeniaProxy.Services
             bool allowInsecureTls = false,
             string? trustedCertificatePath = null)
         {
+            ProtocolLabSelectionAudit.RequireSelectableAndLog("tuic");
+
             server = NormalizeRequiredText(
                 server,
                 MaxHostLength,
