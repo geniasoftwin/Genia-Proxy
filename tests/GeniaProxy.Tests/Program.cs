@@ -254,6 +254,58 @@ namespace GeniaProxy.Tests
                                 localPort
                             );
                 }
+                else if (args.Length == 3 &&
+                         args[0].Equals(
+                             "--write-stable-singbox-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Stable sing-box probe port must be an integer."
+                        );
+                    }
+
+                    json =
+                        Hysteria2ImportService
+                            .CreateSingBoxConfig(
+                                "hysteria2://protocol-lab-test@" +
+                                "127.0.0.1:65534" +
+                                "?sni=example.com",
+                                localPort
+                            );
+                }
+                else if (args.Length == 3 &&
+                         args[0].Equals(
+                             "--write-stable-xray-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Stable Xray probe port must be an integer."
+                        );
+                    }
+
+                    const string stableProbeUuid =
+                        "11111111-2222-3333-4444-555555555555";
+
+                    json =
+                        XrayProfileImportService
+                            .CreateVlessXhttpConfig(
+                                $"vless://{stableProbeUuid}@" +
+                                "127.0.0.1:65534" +
+                                "?encryption=none&security=tls" +
+                                "&sni=example.com&type=xhttp" +
+                                "&path=%2Fstable-smoke" +
+                                "&mode=stream-one",
+                                localPort
+                            );
+                }
                 else
                 {
                     Console.Error.WriteLine(
