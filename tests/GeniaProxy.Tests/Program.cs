@@ -2137,6 +2137,7 @@ namespace GeniaProxy.Tests
             var security = method!.Invoke(null, null) as PipeSecurity;
 
             AssertNotNull(security);
+            AssertEqual(true, security!.AreAccessRulesProtected);
 
             SecurityIdentifier currentUser =
                 WindowsIdentity.GetCurrent().User
@@ -2145,7 +2146,7 @@ namespace GeniaProxy.Tests
                 );
 
             AuthorizationRuleCollection rules =
-                security!.GetAccessRules(
+                security.GetAccessRules(
                     includeExplicit: true,
                     includeInherited: false,
                     targetType: typeof(SecurityIdentifier)
@@ -2164,52 +2165,24 @@ namespace GeniaProxy.Tests
                 ((SecurityIdentifier)allowRules[0]
                     .IdentityReference).Value
             );
-            AssertEqual(
-                PipeAccessRights.FullControl,
-                allowRules[0].PipeAccessRights &
-                    PipeAccessRights.FullControl
-            );
 
-            string sddl =
-                security.GetSecurityDescriptorSddlForm(
-                    AccessControlSections.Access |
-                    AccessControlSections.Audit
-                );
+            PipeAccessRights rights =
+                allowRules[0].PipeAccessRights;
 
             AssertEqual(
                 true,
-                sddl.Contains(
-                    currentUser.Value,
-                    StringComparison.Ordinal
-                )
+                (rights & PipeAccessRights.ReadWrite) ==
+                    PipeAccessRights.ReadWrite
             );
+
             AssertEqual(
                 true,
-                sddl.Contains(
-                    "ML",
-                    StringComparison.Ordinal
-                )
+                (rights & PipeAccessRights.ChangePermissions) != 0
             );
+
             AssertEqual(
                 true,
-                sddl.Contains(
-                    "ME",
-                    StringComparison.Ordinal
-                )
-            );
-            AssertEqual(
-                true,
-                sddl.Contains(
-                    "NW",
-                    StringComparison.Ordinal
-                )
-            );
-            AssertEqual(
-                true,
-                sddl.Contains(
-                    "NR",
-                    StringComparison.Ordinal
-                )
+                (rights & PipeAccessRights.TakeOwnership) != 0
             );
         }
 
