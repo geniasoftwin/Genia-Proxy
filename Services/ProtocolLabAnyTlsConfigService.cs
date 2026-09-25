@@ -14,7 +14,8 @@ namespace GeniaProxy.Services
             string password,
             string? serverName,
             int localPort,
-            bool allowInsecureTls = false)
+            bool allowInsecureTls = false,
+            string? trustedCertificatePath = null)
         {
             server = NormalizeRequiredText(
                 server,
@@ -51,6 +52,29 @@ namespace GeniaProxy.Services
                     "Имя AnyTLS TLS-сервера слишком длинное."
                 );
 
+            var tls = new JsonObject
+            {
+                ["enabled"] = true,
+                ["server_name"] = tlsServerName,
+                ["insecure"] = allowInsecureTls
+            };
+
+            if (!string.IsNullOrWhiteSpace(trustedCertificatePath))
+            {
+                string certificatePath =
+                    trustedCertificatePath.Trim();
+
+                if (certificatePath.Any(char.IsControl))
+                {
+                    throw new FormatException(
+                        "Путь к доверенному TLS-сертификату " +
+                        "содержит управляющие символы."
+                    );
+                }
+
+                tls["certificate_path"] = certificatePath;
+            }
+
             var root = new JsonObject
             {
                 ["log"] = new JsonObject
@@ -85,12 +109,7 @@ namespace GeniaProxy.Services
                         // re-introduce client-identifying metadata.
                         ["client_metadata"] = string.Empty,
 
-                        ["tls"] = new JsonObject
-                        {
-                            ["enabled"] = true,
-                            ["server_name"] = tlsServerName,
-                            ["insecure"] = allowInsecureTls
-                        }
+                        ["tls"] = tls
                     }
                 },
                 ["route"] = new JsonObject
