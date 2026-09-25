@@ -67,6 +67,7 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel),
                 ("Protocol Lab AnyTLS selection gate", ValidateProtocolLabAnyTlsSelectionGate),
                 ("Protocol Lab TUIC selection gate", ValidateProtocolLabTuicSelectionGate),
+                ("Protocol Lab Snell selection gate", ValidateProtocolLabSnellSelectionGate),
                 ("Protocol Lab AnyTLS config", ValidateProtocolLabAnyTlsConfig),
                 ("Protocol Lab AnyTLS validation", ValidateProtocolLabAnyTlsValidation),
                 ("Protocol Lab AnyTLS trusted certificate", ValidateProtocolLabAnyTlsTrustedCertificate),
@@ -2461,10 +2462,10 @@ namespace GeniaProxy.Tests
                 snell.EngineFamily
             );
             AssertEqual(
-                ProtocolLabSupportState.EngineAvailable,
+                ProtocolLabSupportState.RuntimeVerified,
                 snell.SupportState
             );
-            AssertEqual(false, snell.SelectableInProtocolLab);
+            AssertEqual(true, snell.SelectableInProtocolLab);
 
             FeatureCapability whitelist =
                 ProtocolLabFeatureCatalog.Find("whitelist-mode")
@@ -2506,9 +2507,10 @@ namespace GeniaProxy.Tests
                 ProtocolLabFeatureCatalog.Find("unknown")
             );
 
-            AssertThrows<NotSupportedException>(() =>
-                ProtocolLabFeatureCatalog.RequireSelectable("snell")
-            );
+            FeatureCapability selectableSnell =
+                ProtocolLabFeatureCatalog.RequireSelectable("snell");
+
+            AssertEqual("snell", selectableSnell.Id);
 
             AssertThrows<NotSupportedException>(() =>
                 ProtocolLabFeatureCatalog.RequireSelectable("unknown")
@@ -2535,10 +2537,6 @@ namespace GeniaProxy.Tests
             );
             AssertEqual(false, capability.EnabledByDefault);
             AssertEqual(true, capability.SelectableInProtocolLab);
-
-            AssertThrows<NotSupportedException>(() =>
-                ProtocolLabFeatureCatalog.RequireSelectable("snell")
-            );
 
             AssertThrows<NotSupportedException>(() =>
                 ProtocolLabFeatureCatalog.RequireSelectable(
@@ -2575,8 +2573,38 @@ namespace GeniaProxy.Tests
             AssertEqual(true, capability.SelectableInProtocolLab);
 
             AssertThrows<NotSupportedException>(() =>
-                ProtocolLabFeatureCatalog.RequireSelectable("snell")
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "whitelist-mode"
+                )
             );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "xray-experimental"
+                )
+            );
+        }
+
+        private static void ValidateProtocolLabSnellSelectionGate()
+        {
+            FeatureCapability capability =
+                ProtocolLabFeatureCatalog.RequireSelectable("SNELL");
+
+            AssertEqual("snell", capability.Id);
+            AssertEqual(
+                FeatureLane.ProtocolLab,
+                capability.Lane
+            );
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                capability.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.RuntimeVerified,
+                capability.SupportState
+            );
+            AssertEqual(false, capability.EnabledByDefault);
+            AssertEqual(true, capability.SelectableInProtocolLab);
 
             AssertThrows<NotSupportedException>(() =>
                 ProtocolLabFeatureCatalog.RequireSelectable(
