@@ -153,9 +153,9 @@ namespace GeniaProxy
                 UpdateState(ConnectionSessionState.Stopped);
                 UpdateElevationBadge();
 
-                AddLog("GeniaProxy 4.5.0 Alpha 1 RC3 TIMING-AB (Xray 26.3.27 / sing-box 1.14.1) запущен.");
+                AddLog("GeniaProxy 4.5.0 Alpha 2 Protocol Lab (Xray 26.3.27 / sing-box 1.14.1) запущен.");
                 AddLog(
-                    $"RC3 TIMING-AB: mode {TimingAbExperiment.Mode}; " +
+                    $"DNS readiness baseline: mode {TimingAbExperiment.Mode}; " +
                     $"barrier before direct UDP DNS probe = {TimingAbExperiment.BarrierMilliseconds} ms."
                 );
                 AddLog(
@@ -170,7 +170,7 @@ namespace GeniaProxy
                 );
 
                 AddLog(
-                    "Protocol Lab Alpha 1: AnyTLS/TUIC/Snell/Whitelist/Xray experimental отключены."
+                    "Protocol Lab Alpha 2: AnyTLS/TUIC/Snell v6 runtime-verified; Whitelist/Xray experimental design-only; Lab-возможности отключены по умолчанию."
                 );
 
                 try
