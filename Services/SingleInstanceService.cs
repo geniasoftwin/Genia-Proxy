@@ -1,5 +1,6 @@
 using System.IO.Pipes;
 using System.Text;
+using System.Security.AccessControl;
 using System.Security.Principal;
 
 namespace GeniaProxy.Services
@@ -236,12 +237,18 @@ namespace GeniaProxy.Services
             {
                 try
                 {
+                    PipeSecurity pipeSecurity =
+                        CreateActivationPipeSecurity();
+
                     using var server = new NamedPipeServerStream(
                         activationPipeName,
                         PipeDirection.InOut,
                         maxNumberOfServerInstances: 1,
                         PipeTransmissionMode.Byte,
-                        PipeOptions.Asynchronous
+                        PipeOptions.Asynchronous,
+                        inBufferSize: 0,
+                        outBufferSize: 0,
+                        pipeSecurity
                     );
 
                     await server.WaitForConnectionAsync(token);
@@ -303,6 +310,34 @@ namespace GeniaProxy.Services
                     await Task.Delay(250, token);
                 }
             }
+        }
+
+        private static PipeSecurity CreateActivationPipeSecurity()
+        {
+            SecurityIdentifier currentUser =
+                WindowsIdentity.GetCurrent().User
+                ?? throw new InvalidOperationException(
+                    "Не удалось определить SID текущего пользователя."
+                );
+
+            // Keep the activation channel private to the current Windows user,
+            // but label the pipe at medium integrity so a normal (non-elevated)
+            // second launch can activate an elevated primary instance.
+            //
+            // Low-integrity callers remain unable to read/write the pipe.
+            string sddl =
+                $"D:P(A;;FA;;;{currentUser.Value})" +
+                "S:(ML;;NWNR;;;ME)";
+
+            var security = new PipeSecurity();
+
+            security.SetSecurityDescriptorSddlForm(
+                sddl,
+                AccessControlSections.Access |
+                AccessControlSections.Audit
+            );
+
+            return security;
         }
 
         private static int NormalizeTimeout(TimeSpan timeout)
