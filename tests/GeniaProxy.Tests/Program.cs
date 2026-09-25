@@ -76,7 +76,9 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab Snell v6 config", ValidateProtocolLabSnellConfig),
                 ("Protocol Lab Snell v6 validation", ValidateProtocolLabSnellValidation),
                 ("Protocol Lab whitelist boundary", ValidateProtocolLabWhitelistBoundary),
-                ("Protocol Lab whitelist activation blocked", ValidateProtocolLabWhitelistActivationBlocked)
+                ("Protocol Lab whitelist activation blocked", ValidateProtocolLabWhitelistActivationBlocked),
+                ("Protocol Lab Xray experimental boundary", ValidateProtocolLabXrayExperimentalBoundary),
+                ("Protocol Lab Xray experimental activation blocked", ValidateProtocolLabXrayExperimentalActivationBlocked)
             ];
 
             int failed = 0;
@@ -3148,6 +3150,70 @@ namespace GeniaProxy.Tests
             AssertThrows<NotSupportedException>(() =>
                 ProtocolLabFeatureCatalog.RequireSelectable(
                     "whitelist-mode"
+                )
+            );
+        }
+
+        private static void ValidateProtocolLabXrayExperimentalBoundary()
+        {
+            ProtocolLabXrayExperimentalBoundary.ValidateBoundary();
+
+            XrayExperimentalBoundary boundary =
+                ProtocolLabXrayExperimentalBoundary.Current;
+
+            AssertEqual(
+                XrayExperimentalImplementationState.DesignOnly,
+                boundary.State
+            );
+            AssertEqual(false, boundary.Selectable);
+            AssertEqual(
+                false,
+                boundary.MayReplaceStablePinnedEngine
+            );
+            AssertEqual(
+                false,
+                boundary.MayReuseStableProfilePathWithoutValidation
+            );
+            AssertEqual(
+                false,
+                boundary.MayRelaxStableProfileHardening
+            );
+            AssertEqual(true, boundary.RequiresSeparateEnginePin);
+            AssertEqual(true, boundary.RequiresEngineHashVerification);
+            AssertEqual(true, boundary.RequiresSeparateRuntimeEvidence);
+            AssertEqual(
+                true,
+                boundary.RequiresExplicitExperimentalOptIn
+            );
+
+            FeatureCapability capability =
+                ProtocolLabFeatureCatalog.Find("xray-experimental")
+                ?? throw new Exception(
+                    "Xray experimental capability отсутствует."
+                );
+
+            AssertEqual(
+                ProtocolLabEngineFamily.Xray,
+                capability.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.DesignOnly,
+                capability.SupportState
+            );
+            AssertEqual(false, capability.EnabledByDefault);
+            AssertEqual(false, capability.SelectableInProtocolLab);
+        }
+
+        private static void ValidateProtocolLabXrayExperimentalActivationBlocked()
+        {
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabXrayExperimentalBoundary
+                    .ThrowIfRuntimeActivationRequested()
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "xray-experimental"
                 )
             );
         }
