@@ -3313,6 +3313,59 @@ namespace GeniaProxy.Tests
                 )
             );
 
+            const string privateServer =
+                "private-audit.example.test";
+            const string privateSecret =
+                "AUDIT_SECRET_DO_NOT_LOG";
+
+            string? emitted = null;
+
+            void Capture(string message)
+            {
+                emitted = message;
+            }
+
+            ProtocolLabSelectionAudit.SelectionLogged += Capture;
+
+            try
+            {
+                _ = ProtocolLabAnyTlsConfigService
+                    .CreateLocalProxyConfig(
+                        privateServer,
+                        443,
+                        privateSecret,
+                        privateServer,
+                        2080
+                    );
+            }
+            finally
+            {
+                ProtocolLabSelectionAudit.SelectionLogged -= Capture;
+            }
+
+            AssertEqual(false, string.IsNullOrWhiteSpace(emitted));
+            AssertEqual(
+                true,
+                emitted!.Contains(
+                    "id=anytls",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                false,
+                emitted.Contains(
+                    privateServer,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+            AssertEqual(
+                false,
+                emitted.Contains(
+                    privateSecret,
+                    StringComparison.Ordinal
+                )
+            );
+
             AssertThrows<NotSupportedException>(() =>
                 ProtocolLabSelectionAudit.CreateLogLine("unknown")
             );
