@@ -1,4 +1,8 @@
+using System.IO.Pipes;
 using System.Net;
+using System.Reflection;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json.Nodes;
 using GeniaProxy.ControlPlane;
@@ -53,6 +57,7 @@ namespace GeniaProxy.Tests
                 ("Control Plane transition guard", ValidateControlPlaneTransitionGuard),
                 ("Startup journal live-readable", ValidateStartupJournalLiveReadable),
                 ("Single-instance activation ACK", ValidateSingleInstanceActivationAck),
+                ("Single-instance UAC pipe security", ValidateSingleInstanceActivationPipeSecurity),
                 ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary)
             ];
 
@@ -2116,6 +2121,95 @@ namespace GeniaProxy.Tests
             AssertEqual(
                 true,
                 activated.Wait(TimeSpan.FromSeconds(2))
+            );
+        }
+
+        private static void ValidateSingleInstanceActivationPipeSecurity()
+        {
+            MethodInfo? method = typeof(SingleInstanceService)
+                .GetMethod(
+                    "CreateActivationPipeSecurity",
+                    BindingFlags.NonPublic | BindingFlags.Static
+                );
+
+            AssertNotNull(method);
+
+            var security = method!.Invoke(null, null) as PipeSecurity;
+
+            AssertNotNull(security);
+
+            SecurityIdentifier currentUser =
+                WindowsIdentity.GetCurrent().User
+                ?? throw new Exception(
+                    "Не удалось определить SID текущего пользователя."
+                );
+
+            AuthorizationRuleCollection rules =
+                security!.GetAccessRules(
+                    includeExplicit: true,
+                    includeInherited: false,
+                    targetType: typeof(SecurityIdentifier)
+                );
+
+            PipeAccessRule[] allowRules = rules
+                .Cast<PipeAccessRule>()
+                .Where(rule =>
+                    rule.AccessControlType ==
+                        AccessControlType.Allow)
+                .ToArray();
+
+            AssertEqual(1, allowRules.Length);
+            AssertEqual(
+                currentUser.Value,
+                ((SecurityIdentifier)allowRules[0]
+                    .IdentityReference).Value
+            );
+            AssertEqual(
+                PipeAccessRights.FullControl,
+                allowRules[0].PipeAccessRights &
+                    PipeAccessRights.FullControl
+            );
+
+            string sddl =
+                security.GetSecurityDescriptorSddlForm(
+                    AccessControlSections.Access |
+                    AccessControlSections.Audit
+                );
+
+            AssertEqual(
+                true,
+                sddl.Contains(
+                    currentUser.Value,
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                true,
+                sddl.Contains(
+                    "ML",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                true,
+                sddl.Contains(
+                    "ME",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                true,
+                sddl.Contains(
+                    "NW",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                true,
+                sddl.Contains(
+                    "NR",
+                    StringComparison.Ordinal
+                )
             );
         }
 
