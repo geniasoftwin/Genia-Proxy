@@ -74,7 +74,9 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab TUIC config", ValidateProtocolLabTuicConfig),
                 ("Protocol Lab TUIC validation", ValidateProtocolLabTuicValidation),
                 ("Protocol Lab Snell v6 config", ValidateProtocolLabSnellConfig),
-                ("Protocol Lab Snell v6 validation", ValidateProtocolLabSnellValidation)
+                ("Protocol Lab Snell v6 validation", ValidateProtocolLabSnellValidation),
+                ("Protocol Lab whitelist boundary", ValidateProtocolLabWhitelistBoundary),
+                ("Protocol Lab whitelist activation blocked", ValidateProtocolLabWhitelistActivationBlocked)
             ];
 
             int failed = 0;
@@ -3092,6 +3094,61 @@ namespace GeniaProxy.Tests
             AssertEqual(
                 "lab-user-key",
                 root["outbounds"]?[0]?["userkey"]?.GetValue<string>()
+            );
+        }
+
+        private static void ValidateProtocolLabWhitelistBoundary()
+        {
+            ProtocolLabWhitelistModeBoundary.ValidateBoundary();
+
+            WhitelistModeBoundary boundary =
+                ProtocolLabWhitelistModeBoundary.Current;
+
+            AssertEqual(
+                WhitelistModeImplementationState.DesignOnly,
+                boundary.State
+            );
+            AssertEqual(false, boundary.Selectable);
+            AssertEqual(
+                false,
+                boundary.MayModifyStableConnectionPath
+            );
+            AssertEqual(false, boundary.MayModifySystemRoutes);
+            AssertEqual(false, boundary.MayModifySystemDns);
+            AssertEqual(
+                false,
+                boundary.MayUseThirdPartyServiceImpersonation
+            );
+            AssertEqual(
+                true,
+                boundary.RequiresExplicitExperimentalOptIn
+            );
+
+            FeatureCapability capability =
+                ProtocolLabFeatureCatalog.Find("whitelist-mode")
+                ?? throw new Exception(
+                    "Whitelist capability отсутствует."
+                );
+
+            AssertEqual(
+                ProtocolLabSupportState.DesignOnly,
+                capability.SupportState
+            );
+            AssertEqual(false, capability.EnabledByDefault);
+            AssertEqual(false, capability.SelectableInProtocolLab);
+        }
+
+        private static void ValidateProtocolLabWhitelistActivationBlocked()
+        {
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabWhitelistModeBoundary
+                    .ThrowIfRuntimeActivationRequested()
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "whitelist-mode"
+                )
             );
         }
 
