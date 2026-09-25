@@ -35,6 +35,8 @@ namespace GeniaProxy.Services
             bool reuse = false,
             string? userKey = null)
         {
+            ProtocolLabSelectionAudit.RequireSelectableAndLog("snell");
+
             server = NormalizeRequiredText(
                 server,
                 MaxHostLength,
