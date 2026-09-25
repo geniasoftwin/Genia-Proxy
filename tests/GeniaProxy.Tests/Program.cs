@@ -2405,10 +2405,10 @@ namespace GeniaProxy.Tests
                 tuic.EngineFamily
             );
             AssertEqual(
-                ProtocolLabSupportState.EngineAvailable,
+                ProtocolLabSupportState.RuntimeVerified,
                 tuic.SupportState
             );
-            AssertEqual(false, tuic.SelectableInProtocolLab);
+            AssertEqual(true, tuic.SelectableInProtocolLab);
 
             FeatureCapability snell =
                 ProtocolLabFeatureCatalog.Find("snell")
