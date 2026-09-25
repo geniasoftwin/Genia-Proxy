@@ -68,7 +68,9 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab AnyTLS selection gate", ValidateProtocolLabAnyTlsSelectionGate),
                 ("Protocol Lab AnyTLS config", ValidateProtocolLabAnyTlsConfig),
                 ("Protocol Lab AnyTLS validation", ValidateProtocolLabAnyTlsValidation),
-                ("Protocol Lab AnyTLS trusted certificate", ValidateProtocolLabAnyTlsTrustedCertificate)
+                ("Protocol Lab AnyTLS trusted certificate", ValidateProtocolLabAnyTlsTrustedCertificate),
+                ("Protocol Lab TUIC config", ValidateProtocolLabTuicConfig),
+                ("Protocol Lab TUIC validation", ValidateProtocolLabTuicValidation)
             ];
 
             int failed = 0;
@@ -156,6 +158,24 @@ namespace GeniaProxy.Tests
                                 trustedCertificatePath: args[4]
                             );
                 }
+                else if (args.Length == 2 &&
+                         args[0].Equals(
+                             "--write-tuic-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    json =
+                        ProtocolLabTuicConfigService
+                            .CreateLocalProxyConfig(
+                                "example.com",
+                                443,
+                                "11111111-2222-3333-4444-555555555555",
+                                "protocol-lab-test",
+                                "example.com",
+                                2080
+                            );
+                }
                 else
                 {
                     Console.Error.WriteLine(
@@ -174,7 +194,7 @@ namespace GeniaProxy.Tests
                 );
 
                 Console.WriteLine(
-                    "Protocol Lab AnyTLS config written: " +
+                    "Protocol Lab config written: " +
                     Path.GetFullPath(outputPath)
                 );
 
@@ -2660,6 +2680,152 @@ namespace GeniaProxy.Tests
                     trustedCertificatePath:
                         "C:\\ProtocolLab\\bad\ncert.pem"
                 )
+            );
+        }
+
+        private static void ValidateProtocolLabTuicConfig()
+        {
+            string json =
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    "tls.example.com",
+                    2080
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)?.AsObject()
+                ?? throw new Exception(
+                    "Не создан TUIC JSON."
+                );
+
+            JsonObject outbound =
+                root["outbounds"]?[0]?.AsObject()
+                ?? throw new Exception(
+                    "Не создан TUIC outbound."
+                );
+
+            AssertEqual(
+                "tuic",
+                outbound["type"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "edge.example.com",
+                outbound["server"]?.GetValue<string>()
+            );
+            AssertEqual(
+                443,
+                outbound["server_port"]?.GetValue<int>()
+            );
+            AssertEqual(
+                "11111111-2222-3333-4444-555555555555",
+                outbound["uuid"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "secret",
+                outbound["password"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "cubic",
+                outbound["congestion_control"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "native",
+                outbound["udp_relay_mode"]?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound["zero_rtt_handshake"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "10s",
+                outbound["heartbeat"]?.GetValue<string>()
+            );
+            AssertEqual(
+                true,
+                outbound["tls"]?["enabled"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "tls.example.com",
+                outbound["tls"]?["server_name"]
+                    ?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound["tls"]?["insecure"]?.GetValue<bool>()
+            );
+        }
+
+        private static void ValidateProtocolLabTuicValidation()
+        {
+            AssertThrows<FormatException>(() =>
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "not-a-uuid",
+                    "secret",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentException>(() =>
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    null,
+                    2080,
+                    congestionControl: "invalid"
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    null,
+                    2080,
+                    udpRelayMode: "invalid"
+                )
+            );
+
+            string json =
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "127.0.0.1",
+                    4443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    "localhost",
+                    2080,
+                    allowInsecureTls: false,
+                    trustedCertificatePath:
+                        @"C:\ProtocolLab\tuic-cert.pem"
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)!.AsObject();
+
+            AssertEqual(
+                @"C:\ProtocolLab\tuic-cert.pem",
+                root["outbounds"]?[0]?["tls"]?
+                    ["certificate_path"]?.GetValue<string>()
             );
         }
 
