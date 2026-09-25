@@ -78,7 +78,9 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab whitelist boundary", ValidateProtocolLabWhitelistBoundary),
                 ("Protocol Lab whitelist activation blocked", ValidateProtocolLabWhitelistActivationBlocked),
                 ("Protocol Lab Xray experimental boundary", ValidateProtocolLabXrayExperimentalBoundary),
-                ("Protocol Lab Xray experimental activation blocked", ValidateProtocolLabXrayExperimentalActivationBlocked)
+                ("Protocol Lab Xray experimental activation blocked", ValidateProtocolLabXrayExperimentalActivationBlocked),
+                ("Protocol Lab selection audit", ValidateProtocolLabSelectionAudit),
+                ("Protocol Lab local-proxy isolation", ValidateProtocolLabLocalProxyIsolation)
             ];
 
             int failed = 0;
@@ -3215,6 +3217,145 @@ namespace GeniaProxy.Tests
                 ProtocolLabFeatureCatalog.RequireSelectable(
                     "xray-experimental"
                 )
+            );
+        }
+
+        private static void ValidateProtocolLabSelectionAudit()
+        {
+            string anyTls =
+                ProtocolLabSelectionAudit.CreateLogLine("ANYTLS");
+
+            AssertEqual(
+                true,
+                anyTls.Contains(
+                    "id=anytls",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                true,
+                anyTls.Contains(
+                    "engine=SingBox",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                true,
+                anyTls.Contains(
+                    "support=RuntimeVerified",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                false,
+                anyTls.Contains(
+                    "password",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+            AssertEqual(
+                false,
+                anyTls.Contains(
+                    "server=",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabSelectionAudit.CreateLogLine("unknown")
+            );
+        }
+
+        private static void ValidateProtocolLabLocalProxyIsolation()
+        {
+            string anyTls =
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "secret",
+                    "edge.example.com",
+                    2080
+                );
+
+            string tuic =
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    "edge.example.com",
+                    2081
+                );
+
+            string snell =
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "123456789012",
+                    2082
+                );
+
+            ProtocolLabConfigSafetyService
+                .ValidateLocalProxyIsolation("anytls", anyTls);
+
+            ProtocolLabConfigSafetyService
+                .ValidateLocalProxyIsolation("tuic", tuic);
+
+            ProtocolLabConfigSafetyService
+                .ValidateLocalProxyIsolation("snell", snell);
+
+            const string unsafeTun = """
+                {
+                  "inbounds": [
+                    {
+                      "type": "tun",
+                      "tag": "tun-in",
+                      "interface_name": "GeniaProxy"
+                    }
+                  ],
+                  "outbounds": [
+                    {
+                      "type": "direct",
+                      "tag": "direct"
+                    }
+                  ]
+                }
+                """;
+
+            AssertThrows<InvalidDataException>(() =>
+                ProtocolLabConfigSafetyService
+                    .ValidateLocalProxyIsolation(
+                        "anytls",
+                        unsafeTun
+                    )
+            );
+
+            const string unsafeSystemProxy = """
+                {
+                  "inbounds": [
+                    {
+                      "type": "mixed",
+                      "tag": "mixed-in",
+                      "listen": "127.0.0.1",
+                      "listen_port": 2080,
+                      "set_system_proxy": true
+                    }
+                  ],
+                  "outbounds": [
+                    {
+                      "type": "direct",
+                      "tag": "direct"
+                    }
+                  ]
+                }
+                """;
+
+            AssertThrows<InvalidDataException>(() =>
+                ProtocolLabConfigSafetyService
+                    .ValidateLocalProxyIsolation(
+                        "tuic",
+                        unsafeSystemProxy
+                    )
             );
         }
 
