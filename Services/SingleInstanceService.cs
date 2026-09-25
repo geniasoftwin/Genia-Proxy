@@ -240,16 +240,17 @@ namespace GeniaProxy.Services
                     PipeSecurity pipeSecurity =
                         CreateActivationPipeSecurity();
 
-                    using var server = new NamedPipeServerStream(
-                        activationPipeName,
-                        PipeDirection.InOut,
-                        maxNumberOfServerInstances: 1,
-                        PipeTransmissionMode.Byte,
-                        PipeOptions.Asynchronous,
-                        inBufferSize: 0,
-                        outBufferSize: 0,
-                        pipeSecurity
-                    );
+                    using var server =
+                        NamedPipeServerStreamAcl.Create(
+                            activationPipeName,
+                            PipeDirection.InOut,
+                            1,
+                            PipeTransmissionMode.Byte,
+                            PipeOptions.Asynchronous,
+                            0,
+                            0,
+                            pipeSecurity
+                        );
 
                     await server.WaitForConnectionAsync(token);
 
