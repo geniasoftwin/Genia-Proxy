@@ -40,7 +40,7 @@ $UsedTcpPorts = [System.Collections.Generic.HashSet[int]]::new()
 
 function Get-UniqueTcpPort {
     do {
-        $port = Get-UniqueTcpPort
+        $port = Get-FreeTcpPort
     }
     while (-not $UsedTcpPorts.Add($port))
 
