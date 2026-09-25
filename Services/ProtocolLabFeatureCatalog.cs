@@ -57,8 +57,8 @@ namespace GeniaProxy.Services
                 false,
                 "Alpha 2 / Protocol Lab",
                 ProtocolLabEngineFamily.SingBox,
-                ProtocolLabSupportState.EngineAvailable,
-                false
+                ProtocolLabSupportState.RuntimeVerified,
+                true
             ),
             new(
                 "whitelist-mode",
