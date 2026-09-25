@@ -20,6 +20,10 @@ $PinnedXrayExeSha256 = "15C2D007954AC53BA69B80EC91242786B3C0B71D52649165B4CA1D5C
 $BrowserSwitcherDirectory = Join-Path $Root "browser-integration\Genia-Proxy-Switcher"
 $BrowserSwitcherManifest = Join-Path $BrowserSwitcherDirectory "manifest.json"
 $ProtocolLabBoundary = Join-Path $Root "PROTOCOL-LAB-BOUNDARY.md"
+$ProtocolLabStatus = Join-Path $Root "PROTOCOL-LAB-ALPHA2-STATUS.md"
+$WhitelistBoundary = Join-Path $Root "PROTOCOL-LAB-WHITELIST-BOUNDARY.md"
+$XrayExperimentalBoundary = Join-Path $Root "PROTOCOL-LAB-XRAY-EXPERIMENTAL-BOUNDARY.md"
+$StableEngineSmoke = Join-Path $Root "tests\windows\Test-StableEngineSmoke.ps1"
 $PublishDirectory = Join-Path $Root "publish"
 $BuildDirectory = Join-Path $Root "bin"
 $IntermediateDirectory = Join-Path $Root "obj"
@@ -36,7 +40,7 @@ if ([string]::IsNullOrWhiteSpace($Version) -or
 }
 
 $Archive = Join-Path $Root (
-    "GeniaProxy-portable-{0}-v{1}.zip" -f $Runtime, $Version
+    "GeniaProxy-{0}-Alpha2-ProtocolLab-portable-{1}.zip" -f $Version, $Runtime
 )
 
 function Assert-LastExitCode {
@@ -219,11 +223,27 @@ if (-not (Test-Path -LiteralPath (Join-Path $Root "Services\BrowserDirectBridgeS
 if (-not (Test-Path -LiteralPath $ProtocolLabBoundary)) {
     throw "PROTOCOL-LAB-BOUNDARY.md was not found."
 }
+if (-not (Test-Path -LiteralPath $ProtocolLabStatus)) {
+    throw "PROTOCOL-LAB-ALPHA2-STATUS.md was not found."
+}
+if (-not (Test-Path -LiteralPath $WhitelistBoundary)) {
+    throw "PROTOCOL-LAB-WHITELIST-BOUNDARY.md was not found."
+}
+if (-not (Test-Path -LiteralPath $XrayExperimentalBoundary)) {
+    throw "PROTOCOL-LAB-XRAY-EXPERIMENTAL-BOUNDARY.md was not found."
+}
+if (-not (Test-Path -LiteralPath $StableEngineSmoke)) {
+    throw "tests\windows\Test-StableEngineSmoke.ps1 was not found."
+}
 
 $StartupSource = Get-Content -LiteralPath (Join-Path $Root "Program.cs") -Raw -Encoding UTF8
 $SingleInstanceSource = Get-Content -LiteralPath (Join-Path $Root "Services\SingleInstanceService.cs") -Raw -Encoding UTF8
 $StartupJournalSource = Get-Content -LiteralPath (Join-Path $Root "Services\StartupJournal.cs") -Raw -Encoding UTF8
 $ProtocolLabSource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabFeatureCatalog.cs") -Raw -Encoding UTF8
+$ProtocolLabAuditSource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabSelectionAudit.cs") -Raw -Encoding UTF8
+$ProtocolLabSafetySource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabConfigSafetyService.cs") -Raw -Encoding UTF8
+$WhitelistBoundarySource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabWhitelistModeBoundary.cs") -Raw -Encoding UTF8
+$XrayExperimentalBoundarySource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabXrayExperimentalBoundary.cs") -Raw -Encoding UTF8
 $TestsSource = Get-Content -LiteralPath (Join-Path $Root "tests\GeniaProxy.Tests\Program.cs") -Raw -Encoding UTF8
 
 foreach ($RequiredMarker in @(
@@ -267,14 +287,47 @@ foreach ($RequiredMarker in @(
 foreach ($RequiredMarker in @(
     'Startup journal live-readable',
     'Single-instance activation ACK',
-    'Protocol Lab Alpha 1 boundary'
+    'Protocol Lab Alpha 1 boundary',
+    'Protocol Lab Alpha 2 capability model',
+    'Protocol Lab AnyTLS selection gate',
+    'Protocol Lab TUIC selection gate',
+    'Protocol Lab Snell selection gate',
+    'Protocol Lab whitelist boundary',
+    'Protocol Lab Xray experimental boundary',
+    'Protocol Lab selection audit',
+    'Protocol Lab local-proxy isolation'
 )) {
     if (-not $TestsSource.Contains($RequiredMarker)) {
-        throw ("FIX4 regression test marker missing: {0}" -f $RequiredMarker)
+        throw ("Alpha 2 regression test marker missing: {0}" -f $RequiredMarker)
     }
 }
 
-Write-Host "[OK] FIX4 startup recovery, ACK activation and Protocol Lab boundary markers verified." -ForegroundColor Green
+foreach ($RequiredMarker in @(
+    'Protocol Lab selection',
+    'support=',
+    'enabledByDefault='
+)) {
+    if (-not $ProtocolLabAuditSource.Contains($RequiredMarker)) {
+        throw ("Protocol Lab audit marker missing: {0}" -f $RequiredMarker)
+    }
+}
+
+foreach ($RequiredMarker in @(
+    'RequireSelectable',
+    'set_system_proxy',
+    '127.0.0.1'
+)) {
+    if (-not $ProtocolLabSafetySource.Contains($RequiredMarker)) {
+        throw ("Protocol Lab config safety marker missing: {0}" -f $RequiredMarker)
+    }
+}
+
+if (-not $WhitelistBoundarySource.Contains('DesignOnly') -or
+    -not $XrayExperimentalBoundarySource.Contains('DesignOnly')) {
+    throw "Alpha 2 design-only boundary marker missing."
+}
+
+Write-Host "[OK] Alpha 2 startup recovery, capability, audit and isolation markers verified." -ForegroundColor Green
 
 if (Test-Path -LiteralPath $PublishDirectory) {
     Remove-Item -LiteralPath $PublishDirectory -Recurse -Force
@@ -355,6 +408,9 @@ $PublishedWintun = Join-Path $PublishDirectory "engine\wintun.dll"
 $PublishedWintunChecksum = Join-Path $PublishDirectory "engine\wintun.sha256"
 $PublishedNotices = Join-Path $PublishDirectory "THIRD-PARTY-NOTICES.md"
 $PublishedProtocolLabBoundary = Join-Path $PublishDirectory "PROTOCOL-LAB-BOUNDARY.md"
+$PublishedProtocolLabStatus = Join-Path $PublishDirectory "PROTOCOL-LAB-ALPHA2-STATUS.md"
+$PublishedWhitelistBoundary = Join-Path $PublishDirectory "PROTOCOL-LAB-WHITELIST-BOUNDARY.md"
+$PublishedXrayExperimentalBoundary = Join-Path $PublishDirectory "PROTOCOL-LAB-XRAY-EXPERIMENTAL-BOUNDARY.md"
 $PublishedBrowserSwitcherDirectory = Join-Path $PublishDirectory "browser-integration\Genia-Proxy-Switcher"
 $PublishedBrowserSwitcherManifest = Join-Path $PublishedBrowserSwitcherDirectory "manifest.json"
 $ProfilesDirectory = Join-Path $PublishDirectory "data\profiles"
@@ -416,6 +472,15 @@ if (-not (Test-Path -LiteralPath $PublishedNotices)) {
 
 if (-not (Test-Path -LiteralPath $PublishedProtocolLabBoundary)) {
     throw "Published PROTOCOL-LAB-BOUNDARY.md was not found."
+}
+if (-not (Test-Path -LiteralPath $PublishedProtocolLabStatus)) {
+    throw "Published PROTOCOL-LAB-ALPHA2-STATUS.md was not found."
+}
+if (-not (Test-Path -LiteralPath $PublishedWhitelistBoundary)) {
+    throw "Published PROTOCOL-LAB-WHITELIST-BOUNDARY.md was not found."
+}
+if (-not (Test-Path -LiteralPath $PublishedXrayExperimentalBoundary)) {
+    throw "Published PROTOCOL-LAB-XRAY-EXPERIMENTAL-BOUNDARY.md was not found."
 }
 
 if (-not (Test-Path -LiteralPath $PublishedBrowserSwitcherManifest)) {
@@ -509,4 +574,5 @@ Write-Host ("wintun.dll:     {0}" -f (Test-Path -LiteralPath $PublishedWintun))
 Write-Host ("Direct Bridge code: {0}" -f (Test-Path -LiteralPath (Join-Path $Root "Services\BrowserDirectBridgeService.cs")))
 Write-Host ("Switcher Direct 5.6.0 Stable: {0}" -f (Test-Path -LiteralPath $PublishedBrowserSwitcherManifest))
 Write-Host ("Notices:        {0}" -f (Test-Path -LiteralPath $PublishedNotices))
+Write-Host ("Alpha 2 status: {0}" -f (Test-Path -LiteralPath $PublishedProtocolLabStatus))
 Write-Host ("ZIP archive:    {0}" -f (Test-Path -LiteralPath $Archive))
