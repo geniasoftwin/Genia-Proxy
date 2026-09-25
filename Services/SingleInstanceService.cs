@@ -1,6 +1,9 @@
+using System.ComponentModel;
 using System.IO.Pipes;
-using System.Text;
+using System.Runtime.InteropServices;
+using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Text;
 
 namespace GeniaProxy.Services
 {
@@ -236,13 +239,24 @@ namespace GeniaProxy.Services
             {
                 try
                 {
-                    using var server = new NamedPipeServerStream(
-                        activationPipeName,
-                        PipeDirection.InOut,
-                        maxNumberOfServerInstances: 1,
-                        PipeTransmissionMode.Byte,
-                        PipeOptions.Asynchronous
-                    );
+                    PipeSecurity pipeSecurity =
+                        CreateActivationPipeSecurity();
+
+                    using var server =
+                        NamedPipeServerStreamAcl.Create(
+                            activationPipeName,
+                            PipeDirection.InOut,
+                            1,
+                            PipeTransmissionMode.Byte,
+                            PipeOptions.Asynchronous,
+                            0,
+                            0,
+                            pipeSecurity,
+                            HandleInheritability.None,
+                            PipeAccessRights.TakeOwnership
+                        );
+
+                    ApplyMediumIntegrityLabel(server);
 
                     await server.WaitForConnectionAsync(token);
 
@@ -304,6 +318,139 @@ namespace GeniaProxy.Services
                 }
             }
         }
+
+        private static PipeSecurity CreateActivationPipeSecurity()
+        {
+            SecurityIdentifier currentUser =
+                WindowsIdentity.GetCurrent().User
+                ?? throw new InvalidOperationException(
+                    "Не удалось определить SID текущего пользователя."
+                );
+
+            var security = new PipeSecurity();
+
+            security.SetAccessRuleProtection(
+                isProtected: true,
+                preserveInheritance: false
+            );
+
+            security.AddAccessRule(
+                new PipeAccessRule(
+                    currentUser,
+                    PipeAccessRights.FullControl,
+                    AccessControlType.Allow
+                )
+            );
+
+            return security;
+        }
+
+        private static void ApplyMediumIntegrityLabel(
+            NamedPipeServerStream server)
+        {
+            const string labelSddl = "S:(ML;;NW;;;ME)";
+            const uint sddlRevision1 = 1;
+            const int seKernelObject = 6;
+            const uint labelSecurityInformation = 0x00000010;
+
+            if (!ConvertStringSecurityDescriptorToSecurityDescriptor(
+                    labelSddl,
+                    sddlRevision1,
+                    out IntPtr securityDescriptor,
+                    out _))
+            {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Не удалось создать Medium integrity label для activation pipe."
+                );
+            }
+
+            try
+            {
+                if (!GetSecurityDescriptorSacl(
+                        securityDescriptor,
+                        out bool saclPresent,
+                        out IntPtr sacl,
+                        out _))
+                {
+                    throw new Win32Exception(
+                        Marshal.GetLastWin32Error(),
+                        "Не удалось получить mandatory label ACL."
+                    );
+                }
+
+                if (!saclPresent || sacl == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException(
+                        "Mandatory label ACL отсутствует."
+                    );
+                }
+
+                uint result = SetSecurityInfo(
+                    server.SafePipeHandle.DangerousGetHandle(),
+                    seKernelObject,
+                    labelSecurityInformation,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    sacl
+                );
+
+                if (result != 0)
+                {
+                    throw new Win32Exception(
+                        unchecked((int)result),
+                        "Не удалось применить Medium integrity label к activation pipe."
+                    );
+                }
+            }
+            finally
+            {
+                _ = LocalFree(securityDescriptor);
+            }
+        }
+
+        [DllImport(
+            "advapi32.dll",
+            CharSet = CharSet.Unicode,
+            SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool
+            ConvertStringSecurityDescriptorToSecurityDescriptor(
+                string stringSecurityDescriptor,
+                uint stringSdRevision,
+                out IntPtr securityDescriptor,
+                out uint securityDescriptorSize
+            );
+
+        [DllImport(
+            "advapi32.dll",
+            SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetSecurityDescriptorSacl(
+            IntPtr securityDescriptor,
+            [MarshalAs(UnmanagedType.Bool)] out bool saclPresent,
+            out IntPtr sacl,
+            [MarshalAs(UnmanagedType.Bool)] out bool saclDefaulted
+        );
+
+        [DllImport(
+            "advapi32.dll",
+            SetLastError = true)]
+        private static extern uint SetSecurityInfo(
+            IntPtr handle,
+            int objectType,
+            uint securityInfo,
+            IntPtr owner,
+            IntPtr group,
+            IntPtr dacl,
+            IntPtr sacl
+        );
+
+        [DllImport(
+            "kernel32.dll",
+            SetLastError = true)]
+        private static extern IntPtr LocalFree(IntPtr memory);
 
         private static int NormalizeTimeout(TimeSpan timeout)
         {

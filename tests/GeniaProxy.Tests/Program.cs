@@ -1,4 +1,8 @@
+using System.IO.Pipes;
 using System.Net;
+using System.Reflection;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json.Nodes;
 using GeniaProxy.ControlPlane;
@@ -53,6 +57,7 @@ namespace GeniaProxy.Tests
                 ("Control Plane transition guard", ValidateControlPlaneTransitionGuard),
                 ("Startup journal live-readable", ValidateStartupJournalLiveReadable),
                 ("Single-instance activation ACK", ValidateSingleInstanceActivationAck),
+                ("Single-instance UAC pipe security", ValidateSingleInstanceActivationPipeSecurity),
                 ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary)
             ];
 
@@ -2116,6 +2121,68 @@ namespace GeniaProxy.Tests
             AssertEqual(
                 true,
                 activated.Wait(TimeSpan.FromSeconds(2))
+            );
+        }
+
+        private static void ValidateSingleInstanceActivationPipeSecurity()
+        {
+            MethodInfo? method = typeof(SingleInstanceService)
+                .GetMethod(
+                    "CreateActivationPipeSecurity",
+                    BindingFlags.NonPublic | BindingFlags.Static
+                );
+
+            AssertNotNull(method);
+
+            var security = method!.Invoke(null, null) as PipeSecurity;
+
+            AssertNotNull(security);
+            AssertEqual(true, security!.AreAccessRulesProtected);
+
+            SecurityIdentifier currentUser =
+                WindowsIdentity.GetCurrent().User
+                ?? throw new Exception(
+                    "Не удалось определить SID текущего пользователя."
+                );
+
+            AuthorizationRuleCollection rules =
+                security.GetAccessRules(
+                    includeExplicit: true,
+                    includeInherited: false,
+                    targetType: typeof(SecurityIdentifier)
+                );
+
+            PipeAccessRule[] allowRules = rules
+                .Cast<PipeAccessRule>()
+                .Where(rule =>
+                    rule.AccessControlType ==
+                        AccessControlType.Allow)
+                .ToArray();
+
+            AssertEqual(1, allowRules.Length);
+            AssertEqual(
+                currentUser.Value,
+                ((SecurityIdentifier)allowRules[0]
+                    .IdentityReference).Value
+            );
+
+            PipeAccessRights rights =
+                allowRules[0].PipeAccessRights;
+
+            AssertEqual(
+                true,
+                (rights & PipeAccessRights.ReadWrite) ==
+                    PipeAccessRights.ReadWrite
+            );
+
+            AssertEqual(
+                true,
+                (rights & PipeAccessRights.ChangePermissions) != 0
+            );
+
+            AssertEqual(
+                true,
+                (rights & PipeAccessRights.TakeOwnership) != 0
             );
         }
 
