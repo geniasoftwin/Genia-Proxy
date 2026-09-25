@@ -176,6 +176,34 @@ namespace GeniaProxy.Tests
                                 2080
                             );
                 }
+                else if (args.Length == 5 &&
+                         args[0].Equals(
+                             "--write-tuic-runtime-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int serverPort) ||
+                        !int.TryParse(args[3], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Runtime probe ports must be integers."
+                        );
+                    }
+
+                    json =
+                        ProtocolLabTuicConfigService
+                            .CreateLocalProxyConfig(
+                                "127.0.0.1",
+                                serverPort,
+                                "11111111-2222-3333-4444-555555555555",
+                                "protocol-lab-loopback-secret",
+                                "localhost",
+                                localPort,
+                                allowInsecureTls: false,
+                                trustedCertificatePath: args[4]
+                            );
+                }
                 else
                 {
                     Console.Error.WriteLine(
