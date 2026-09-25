@@ -24,6 +24,7 @@ $ProtocolLabStatus = Join-Path $Root "PROTOCOL-LAB-ALPHA2-STATUS.md"
 $WhitelistBoundary = Join-Path $Root "PROTOCOL-LAB-WHITELIST-BOUNDARY.md"
 $XrayExperimentalBoundary = Join-Path $Root "PROTOCOL-LAB-XRAY-EXPERIMENTAL-BOUNDARY.md"
 $StableEngineSmoke = Join-Path $Root "tests\windows\Test-StableEngineSmoke.ps1"
+$ProtocolLabFailureIsolation = Join-Path $Root "tests\windows\Test-ProtocolLabFailureIsolation.ps1"
 $PublishDirectory = Join-Path $Root "publish"
 $BuildDirectory = Join-Path $Root "bin"
 $IntermediateDirectory = Join-Path $Root "obj"
@@ -235,12 +236,16 @@ if (-not (Test-Path -LiteralPath $XrayExperimentalBoundary)) {
 if (-not (Test-Path -LiteralPath $StableEngineSmoke)) {
     throw "tests\windows\Test-StableEngineSmoke.ps1 was not found."
 }
+if (-not (Test-Path -LiteralPath $ProtocolLabFailureIsolation)) {
+    throw "tests\windows\Test-ProtocolLabFailureIsolation.ps1 was not found."
+}
 
 $StartupSource = Get-Content -LiteralPath (Join-Path $Root "Program.cs") -Raw -Encoding UTF8
 $SingleInstanceSource = Get-Content -LiteralPath (Join-Path $Root "Services\SingleInstanceService.cs") -Raw -Encoding UTF8
 $StartupJournalSource = Get-Content -LiteralPath (Join-Path $Root "Services\StartupJournal.cs") -Raw -Encoding UTF8
 $ProtocolLabSource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabFeatureCatalog.cs") -Raw -Encoding UTF8
 $ProtocolLabAuditSource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabSelectionAudit.cs") -Raw -Encoding UTF8
+$MainWindowSource = Get-Content -LiteralPath (Join-Path $Root "MainWindow.xaml.cs") -Raw -Encoding UTF8
 $ProtocolLabSafetySource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabConfigSafetyService.cs") -Raw -Encoding UTF8
 $WhitelistBoundarySource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabWhitelistModeBoundary.cs") -Raw -Encoding UTF8
 $XrayExperimentalBoundarySource = Get-Content -LiteralPath (Join-Path $Root "Services\ProtocolLabXrayExperimentalBoundary.cs") -Raw -Encoding UTF8
@@ -305,10 +310,21 @@ foreach ($RequiredMarker in @(
 foreach ($RequiredMarker in @(
     'Protocol Lab selection',
     'support=',
-    'enabledByDefault='
+    'enabledByDefault=',
+    'SelectionLogged',
+    'RequireSelectableAndLog'
 )) {
     if (-not $ProtocolLabAuditSource.Contains($RequiredMarker)) {
         throw ("Protocol Lab audit marker missing: {0}" -f $RequiredMarker)
+    }
+}
+
+foreach ($RequiredMarker in @(
+    'ProtocolLabSelectionAudit.SelectionLogged +=',
+    'ProtocolLabSelectionAudit.SelectionLogged -='
+)) {
+    if (-not $MainWindowSource.Contains($RequiredMarker)) {
+        throw ("Protocol Lab UI audit wiring marker missing: {0}" -f $RequiredMarker)
     }
 }
 
