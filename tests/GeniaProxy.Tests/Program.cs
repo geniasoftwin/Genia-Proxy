@@ -59,7 +59,9 @@ namespace GeniaProxy.Tests
                 ("Single-instance activation ACK", ValidateSingleInstanceActivationAck),
                 ("Single-instance UAC pipe security", ValidateSingleInstanceActivationPipeSecurity),
                 ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary),
-                ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel)
+                ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel),
+                ("Protocol Lab AnyTLS config", ValidateProtocolLabAnyTlsConfig),
+                ("Protocol Lab AnyTLS validation", ValidateProtocolLabAnyTlsValidation)
             ];
 
             int failed = 0;
@@ -2321,6 +2323,160 @@ namespace GeniaProxy.Tests
 
             AssertThrows<NotSupportedException>(() =>
                 ProtocolLabFeatureCatalog.RequireSelectable("unknown")
+            );
+        }
+
+        private static void ValidateProtocolLabAnyTlsConfig()
+        {
+            string json =
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "secret",
+                    "tls.example.com",
+                    2080
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)?.AsObject()
+                ?? throw new Exception(
+                    "Не создан AnyTLS JSON."
+                );
+
+            JsonObject inbound =
+                root["inbounds"]?[0]?.AsObject()
+                ?? throw new Exception(
+                    "Не создан AnyTLS mixed inbound."
+                );
+
+            AssertEqual(
+                "127.0.0.1",
+                inbound["listen"]?.GetValue<string>()
+            );
+            AssertEqual(
+                2080,
+                inbound["listen_port"]?.GetValue<int>()
+            );
+
+            JsonObject outbound =
+                root["outbounds"]?[0]?.AsObject()
+                ?? throw new Exception(
+                    "Не создан AnyTLS outbound."
+                );
+
+            AssertEqual(
+                "anytls",
+                outbound["type"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "edge.example.com",
+                outbound["server"]?.GetValue<string>()
+            );
+            AssertEqual(
+                443,
+                outbound["server_port"]?.GetValue<int>()
+            );
+            AssertEqual(
+                "secret",
+                outbound["password"]?.GetValue<string>()
+            );
+            AssertEqual(
+                string.Empty,
+                outbound["client_metadata"]?.GetValue<string>()
+            );
+            AssertEqual(
+                true,
+                outbound["tls"]?["enabled"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "tls.example.com",
+                outbound["tls"]?["server_name"]
+                    ?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound["tls"]?["insecure"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "proxy",
+                root["route"]?["final"]?.GetValue<string>()
+            );
+        }
+
+        private static void ValidateProtocolLabAnyTlsValidation()
+        {
+            AssertThrows<ArgumentException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "",
+                    443,
+                    "secret",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentOutOfRangeException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    0,
+                    "secret",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentOutOfRangeException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "secret",
+                    null,
+                    70000
+                )
+            );
+
+            AssertThrows<FormatException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com\ninvalid",
+                    443,
+                    "secret",
+                    null,
+                    2080
+                )
+            );
+
+            string insecureJson =
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "secret",
+                    null,
+                    2080,
+                    allowInsecureTls: true
+                );
+
+            JsonObject insecureRoot =
+                JsonNode.Parse(insecureJson)!.AsObject();
+
+            AssertEqual(
+                "edge.example.com",
+                insecureRoot["outbounds"]?[0]?["tls"]?
+                    ["server_name"]?.GetValue<string>()
+            );
+            AssertEqual(
+                true,
+                insecureRoot["outbounds"]?[0]?["tls"]?
+                    ["insecure"]?.GetValue<bool>()
             );
         }
 
