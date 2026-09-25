@@ -58,7 +58,8 @@ namespace GeniaProxy.Tests
                 ("Startup journal live-readable", ValidateStartupJournalLiveReadable),
                 ("Single-instance activation ACK", ValidateSingleInstanceActivationAck),
                 ("Single-instance UAC pipe security", ValidateSingleInstanceActivationPipeSecurity),
-                ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary)
+                ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary),
+                ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel)
             ];
 
             int failed = 0;
@@ -2221,6 +2222,106 @@ namespace GeniaProxy.Tests
                 );
                 AssertEqual(false, capability.EnabledByDefault);
             }
+        }
+
+        private static void ValidateProtocolLabCapabilityModel()
+        {
+            ProtocolLabFeatureCatalog.ThrowIfDefaultBoundaryViolated();
+
+            AssertEqual(
+                true,
+                ProtocolLabFeatureCatalog.DefaultBoundaryIsSafe
+            );
+
+            FeatureCapability anyTls =
+                ProtocolLabFeatureCatalog.Find("anytls")
+                ?? throw new Exception("AnyTLS capability отсутствует.");
+
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                anyTls.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.EngineAvailable,
+                anyTls.SupportState
+            );
+            AssertEqual(false, anyTls.SelectableInProtocolLab);
+
+            FeatureCapability tuic =
+                ProtocolLabFeatureCatalog.Find("TUIC")
+                ?? throw new Exception("TUIC capability отсутствует.");
+
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                tuic.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.EngineAvailable,
+                tuic.SupportState
+            );
+            AssertEqual(false, tuic.SelectableInProtocolLab);
+
+            FeatureCapability snell =
+                ProtocolLabFeatureCatalog.Find("snell")
+                ?? throw new Exception("Snell capability отсутствует.");
+
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                snell.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.EngineAvailable,
+                snell.SupportState
+            );
+            AssertEqual(false, snell.SelectableInProtocolLab);
+
+            FeatureCapability whitelist =
+                ProtocolLabFeatureCatalog.Find("whitelist-mode")
+                ?? throw new Exception(
+                    "Whitelist capability отсутствует."
+                );
+
+            AssertEqual(
+                ProtocolLabEngineFamily.Host,
+                whitelist.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.DesignOnly,
+                whitelist.SupportState
+            );
+            AssertEqual(false, whitelist.SelectableInProtocolLab);
+
+            FeatureCapability xrayExperimental =
+                ProtocolLabFeatureCatalog.Find("xray-experimental")
+                ?? throw new Exception(
+                    "Xray experimental capability отсутствует."
+                );
+
+            AssertEqual(
+                ProtocolLabEngineFamily.Xray,
+                xrayExperimental.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.DesignOnly,
+                xrayExperimental.SupportState
+            );
+            AssertEqual(
+                false,
+                xrayExperimental.SelectableInProtocolLab
+            );
+
+            AssertEqual<FeatureCapability?>(
+                null,
+                ProtocolLabFeatureCatalog.Find("unknown")
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable("anytls")
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable("unknown")
+            );
         }
 
         private static string CreateTestDirectory()
