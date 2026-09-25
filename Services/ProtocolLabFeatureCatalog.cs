@@ -6,31 +6,128 @@ namespace GeniaProxy.Services
         ProtocolLab
     }
 
+    public enum ProtocolLabEngineFamily
+    {
+        Host,
+        SingBox,
+        Xray
+    }
+
+    public enum ProtocolLabSupportState
+    {
+        EngineAvailable,
+        DesignOnly
+    }
+
     public sealed record FeatureCapability(
         string Id,
         FeatureLane Lane,
         bool EnabledByDefault,
-        string PlannedMilestone);
+        string PlannedMilestone,
+        ProtocolLabEngineFamily EngineFamily,
+        ProtocolLabSupportState SupportState,
+        bool SelectableInProtocolLab);
 
     public static class ProtocolLabFeatureCatalog
     {
         private static readonly FeatureCapability[] Capabilities =
         [
-            new("anytls", FeatureLane.ProtocolLab, false, "Alpha 2 / Protocol Lab"),
-            new("tuic", FeatureLane.ProtocolLab, false, "Alpha 2 / Protocol Lab"),
-            new("snell", FeatureLane.ProtocolLab, false, "Alpha 2 / Protocol Lab"),
-            new("whitelist-mode", FeatureLane.ProtocolLab, false, "Alpha 2 / Protocol Lab"),
-            new("xray-experimental", FeatureLane.ProtocolLab, false, "Alpha 2 / Protocol Lab")
+            new(
+                "anytls",
+                FeatureLane.ProtocolLab,
+                false,
+                "Alpha 2 / Protocol Lab",
+                ProtocolLabEngineFamily.SingBox,
+                ProtocolLabSupportState.EngineAvailable,
+                false
+            ),
+            new(
+                "tuic",
+                FeatureLane.ProtocolLab,
+                false,
+                "Alpha 2 / Protocol Lab",
+                ProtocolLabEngineFamily.SingBox,
+                ProtocolLabSupportState.EngineAvailable,
+                false
+            ),
+            new(
+                "snell",
+                FeatureLane.ProtocolLab,
+                false,
+                "Alpha 2 / Protocol Lab",
+                ProtocolLabEngineFamily.SingBox,
+                ProtocolLabSupportState.EngineAvailable,
+                false
+            ),
+            new(
+                "whitelist-mode",
+                FeatureLane.ProtocolLab,
+                false,
+                "Alpha 2 / Protocol Lab",
+                ProtocolLabEngineFamily.Host,
+                ProtocolLabSupportState.DesignOnly,
+                false
+            ),
+            new(
+                "xray-experimental",
+                FeatureLane.ProtocolLab,
+                false,
+                "Alpha 2 / Protocol Lab",
+                ProtocolLabEngineFamily.Xray,
+                ProtocolLabSupportState.DesignOnly,
+                false
+            )
         ];
 
         public static IReadOnlyList<FeatureCapability> All => Capabilities;
 
-        public static bool Alpha1BoundaryIsSafe =>
+        public static bool DefaultBoundaryIsSafe =>
             Capabilities
-                .Where(capability => capability.Lane == FeatureLane.ProtocolLab)
+                .Where(capability =>
+                    capability.Lane == FeatureLane.ProtocolLab)
                 .All(capability => !capability.EnabledByDefault);
 
-        public static void ThrowIfAlpha1BoundaryViolated()
+        // Kept as a compatibility alias for the completed Alpha 1
+        // regression/build gates.
+        public static bool Alpha1BoundaryIsSafe =>
+            DefaultBoundaryIsSafe;
+
+        public static FeatureCapability? Find(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return null;
+            }
+
+            return Capabilities.FirstOrDefault(capability =>
+                capability.Id.Equals(
+                    id,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+        }
+
+        public static FeatureCapability RequireSelectable(string id)
+        {
+            FeatureCapability capability =
+                Find(id)
+                ?? throw new NotSupportedException(
+                    "Unknown Protocol Lab capability: " + id
+                );
+
+            if (capability.Lane != FeatureLane.ProtocolLab ||
+                !capability.SelectableInProtocolLab)
+            {
+                throw new NotSupportedException(
+                    "Protocol Lab capability is not selectable: " +
+                    capability.Id
+                );
+            }
+
+            return capability;
+        }
+
+        public static void ThrowIfDefaultBoundaryViolated()
         {
             FeatureCapability? enabledExperimental = Capabilities
                 .FirstOrDefault(capability =>
@@ -40,10 +137,15 @@ namespace GeniaProxy.Services
             if (enabledExperimental is not null)
             {
                 throw new InvalidOperationException(
-                    "Alpha 1 Protocol Lab boundary violated by capability: " +
+                    "Protocol Lab default boundary violated by capability: " +
                     enabledExperimental.Id
                 );
             }
+        }
+
+        public static void ThrowIfAlpha1BoundaryViolated()
+        {
+            ThrowIfDefaultBoundaryViolated();
         }
     }
 }
