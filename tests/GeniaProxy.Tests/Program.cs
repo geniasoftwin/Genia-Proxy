@@ -2465,7 +2465,7 @@ namespace GeniaProxy.Tests
             );
 
             AssertThrows<NotSupportedException>(() =>
-                ProtocolLabFeatureCatalog.RequireSelectable("tuic")
+                ProtocolLabFeatureCatalog.RequireSelectable("snell")
             );
 
             AssertThrows<NotSupportedException>(() =>
