@@ -223,6 +223,30 @@ namespace GeniaProxy.Tests
                                 2080
                             );
                 }
+                else if (args.Length == 4 &&
+                         args[0].Equals(
+                             "--write-snell-runtime-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int serverPort) ||
+                        !int.TryParse(args[3], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Runtime probe ports must be integers."
+                        );
+                    }
+
+                    json =
+                        ProtocolLabSnellConfigService
+                            .CreateLocalProxyConfig(
+                                "127.0.0.1",
+                                serverPort,
+                                "protocol-lab-snell-psk",
+                                localPort
+                            );
+                }
                 else
                 {
                     Console.Error.WriteLine(
