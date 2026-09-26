@@ -152,12 +152,14 @@ namespace GeniaProxy
 
                 int serverPort = ParsePort(
                     ServerPortTextBox.Text,
-                    "Порт сервера"
+                    "Порт сервера",
+                    minimum: 1
                 );
 
                 int localPort = ParsePort(
                     LocalPortTextBox.Text,
-                    "Локальный порт"
+                    "Локальный порт",
+                    minimum: 1024
                 );
 
                 var input = new ProtocolLabUiConnectionInput(
@@ -287,13 +289,15 @@ namespace GeniaProxy
 
         private static int ParsePort(
             string text,
-            string fieldName)
+            string fieldName,
+            int minimum)
         {
             if (!int.TryParse(text, out int value) ||
-                value is < 1024 or > 65535)
+                value < minimum ||
+                value > 65535)
             {
                 throw new FormatException(
-                    $"{fieldName} должен быть от 1024 до 65535."
+                    $"{fieldName} должен быть от {minimum} до 65535."
                 );
             }
 
