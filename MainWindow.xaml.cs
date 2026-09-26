@@ -1537,7 +1537,9 @@ namespace GeniaProxy
             object sender,
             RoutedEventArgs e)
         {
-            var window = new ProtocolLabWindow
+            var window = new ProtocolLabWindow(
+                () => connectionSession.IsRunning
+            )
             {
                 Owner = this
             };
