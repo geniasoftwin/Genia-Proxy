@@ -21,7 +21,7 @@ namespace GeniaProxy
             object sender,
             RoutedEventArgs e)
         {
-            if (sender is not RadioButton radio ||
+            if (sender is not System.Windows.Controls.RadioButton radio ||
                 radio.Tag is not string capabilityId)
             {
                 return;
