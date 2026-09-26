@@ -66,6 +66,7 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary),
                 ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel),
                 ("Protocol Lab Alpha 3 UI model", ValidateProtocolLabUiModel),
+                ("Protocol Lab isolated session boundary", ValidateProtocolLabSessionBoundary),
                 ("Protocol Lab AnyTLS selection gate", ValidateProtocolLabAnyTlsSelectionGate),
                 ("Protocol Lab TUIC selection gate", ValidateProtocolLabTuicSelectionGate),
                 ("Protocol Lab Snell selection gate", ValidateProtocolLabSnellSelectionGate),
@@ -2627,6 +2628,79 @@ namespace GeniaProxy.Tests
                 3,
                 items.Count(item => item.Selectable)
             );
+        }
+
+        private static void ValidateProtocolLabSessionBoundary()
+        {
+            const string unsafeTun = """
+                {
+                  "inbounds": [
+                    {
+                      "type": "tun",
+                      "tag": "tun-in",
+                      "interface_name": "GeniaProxy"
+                    }
+                  ],
+                  "outbounds": [
+                    {
+                      "type": "direct",
+                      "tag": "direct"
+                    }
+                  ]
+                }
+                """;
+
+            using (var session = new ProtocolLabSession())
+            {
+                AssertThrows<InvalidDataException>(() =>
+                    session.StartAsync(
+                        "anytls",
+                        unsafeTun,
+                        21880
+                    ).GetAwaiter().GetResult()
+                );
+
+                AssertEqual(
+                    ProtocolLabSessionState.Failed,
+                    session.State
+                );
+                AssertEqual(false, session.IsRunning);
+                AssertEqual<string?>(null, session.ActiveCapabilityId);
+                AssertEqual(0, session.ActivePort);
+            }
+
+            using (var stableBlocked =
+                new ProtocolLabSession(
+                    stableSessionIsRunning: () => true
+                ))
+            {
+                AssertThrows<InvalidOperationException>(() =>
+                    stableBlocked.StartAsync(
+                        "anytls",
+                        unsafeTun,
+                        21881
+                    ).GetAwaiter().GetResult()
+                );
+
+                AssertEqual(
+                    ProtocolLabSessionState.Failed,
+                    stableBlocked.State
+                );
+                AssertEqual(false, stableBlocked.IsRunning);
+            }
+
+            using (var unsupported = new ProtocolLabSession())
+            {
+                AssertThrows<NotSupportedException>(() =>
+                    unsupported.StartAsync(
+                        "whitelist-mode",
+                        "{}",
+                        21882
+                    ).GetAwaiter().GetResult()
+                );
+
+                AssertEqual(false, unsupported.IsRunning);
+            }
         }
 
         private static void ValidateProtocolLabAnyTlsSelectionGate()
