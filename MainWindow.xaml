@@ -1,7 +1,7 @@
 <Window x:Class="GeniaProxy.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="GeniaProxy 4.5.0 Alpha 1 EXP1"
+        Title="GeniaProxy 4.5.0 Alpha 3 Protocol Lab"
         Width="980"
         Height="530"
         MinWidth="900"
@@ -228,7 +228,7 @@
                         Margin="12,0,0,0"
                         VerticalAlignment="Center">
                     <TextBlock x:Name="VersionBadgeText"
-                               Text="4.5.0 Alpha 1 · State Machine + Journal"
+                               Text="4.5.0 Alpha 3 · Protocol Lab UI"
                                Foreground="#9EDDD6"
                                FontSize="10"
                                FontWeight="SemiBold" />
@@ -298,6 +298,11 @@
                         Style="{StaticResource CompactButtonStyle}"
                         Content="Импорт"
                         Click="ImportProfileButton_Click" />
+                <Button x:Name="ProtocolLabButton"
+                        Style="{StaticResource CompactButtonStyle}"
+                        Content="Protocol Lab"
+                        Margin="8,0,0,0"
+                        Click="ProtocolLabButton_Click" />
                 <Button Style="{StaticResource CompactButtonStyle}"
                         Content="Проверка 1+20"
                         Margin="8,0,0,0"
