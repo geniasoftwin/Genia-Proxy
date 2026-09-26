@@ -65,6 +65,7 @@ namespace GeniaProxy.Tests
                 ("Single-instance UAC pipe security", ValidateSingleInstanceActivationPipeSecurity),
                 ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary),
                 ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel),
+                ("Protocol Lab Alpha 3 UI model", ValidateProtocolLabUiModel),
                 ("Protocol Lab AnyTLS selection gate", ValidateProtocolLabAnyTlsSelectionGate),
                 ("Protocol Lab TUIC selection gate", ValidateProtocolLabTuicSelectionGate),
                 ("Protocol Lab Snell selection gate", ValidateProtocolLabSnellSelectionGate),
@@ -2572,6 +2573,59 @@ namespace GeniaProxy.Tests
 
             AssertThrows<NotSupportedException>(() =>
                 ProtocolLabFeatureCatalog.RequireSelectable("unknown")
+            );
+        }
+
+        private static void ValidateProtocolLabUiModel()
+        {
+            IReadOnlyList<ProtocolLabUiCapability> items =
+                ProtocolLabUiModelService.GetCapabilities();
+
+            AssertEqual(5, items.Count);
+
+            ProtocolLabUiCapability anyTls =
+                items.Single(item => item.Id == "anytls");
+            ProtocolLabUiCapability tuic =
+                items.Single(item => item.Id == "tuic");
+            ProtocolLabUiCapability snell =
+                items.Single(item => item.Id == "snell");
+            ProtocolLabUiCapability whitelist =
+                items.Single(item => item.Id == "whitelist-mode");
+            ProtocolLabUiCapability xray =
+                items.Single(item => item.Id == "xray-experimental");
+
+            AssertEqual("AnyTLS", anyTls.DisplayName);
+            AssertEqual("TUIC", tuic.DisplayName);
+            AssertEqual("Snell v6", snell.DisplayName);
+
+            AssertEqual(true, anyTls.Selectable);
+            AssertEqual(true, tuic.Selectable);
+            AssertEqual(true, snell.Selectable);
+
+            AssertEqual(false, whitelist.Selectable);
+            AssertEqual(false, xray.Selectable);
+
+            AssertEqual(
+                "RUNTIME VERIFIED",
+                anyTls.SupportLabel
+            );
+            AssertEqual(
+                "DESIGN ONLY",
+                whitelist.SupportLabel
+            );
+            AssertEqual(
+                "DESIGN ONLY",
+                xray.SupportLabel
+            );
+
+            AssertEqual(
+                true,
+                items.All(item => !item.EnabledByDefault)
+            );
+
+            AssertEqual(
+                3,
+                items.Count(item => item.Selectable)
             );
         }
 
