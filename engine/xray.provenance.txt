@@ -1,0 +1,9 @@
+version=26.3.27
+commit=d2758a0
+go=go1.26.1
+platform=windows/amd64
+source=validated-bundled-baseline
+release_channel=validated-stable-baseline
+verification=pinned-executable-sha256
+exe_size=35613696
+exe_sha256=15C2D007954AC53BA69B80EC91242786B3C0B71D52649165B4CA1D5CC96EF8F1

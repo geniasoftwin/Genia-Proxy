@@ -1,3 +1,63 @@
+# Changelog
+
+## 4.5.0 Alpha 1 Engine Refresh RC3 — Stable engine baseline
+
+- Keeps accepted sing-box 1.14.1 unchanged.
+- Restores the Windows-validated Xray 26.3.27 baseline after RC2 A/B testing showed intermittent XHTTP/XMUX TUN UDP readiness failures on Xray 26.9.8.
+- Pins the exact Xray 26.3.27 windows/amd64 executable by SHA-256 `15C2D007954AC53BA69B80EC91242786B3C0B71D52649165B4CA1D5CC96EF8F1` and size `35,613,696` bytes.
+- Does not change Windows TUN/DNS/routes, Control Plane, Direct Bridge, Browser Switcher, profile generation, or readiness algorithms.
+- Retains the existing fail-closed block for `pinnedPeerCertSha256` while bundled Xray 26.3.27 is used.
+- Xray 26.9.x remains Experimental/HOLD for Protocol Lab or a later upstream-fixed candidate.
+- FileVersion: 4.5.0.8.
+
+## 4.5.0 Alpha 1 Engine Refresh RC2 — Xray 26.9.8
+
+- Keeps the accepted sing-box 1.14.1 RC1 engine unchanged.
+- Replaces only the Xray candidate from 26.3.27 with official Xray-core 26.9.8 windows-64 for isolated Windows regression testing.
+- Pins the official Xray-windows-64.zip SHA-256 before extraction and records executable provenance.
+- GitHub marks v26.9.8 as a pre-release; RC2 is therefore a candidate only and is not promoted to the stable baseline until Local/TUN/XHTTP/REALITY regression passes.
+- EXP1 FIX4 Control Plane, startup recovery, Direct Bridge, Browser Switcher, Windows TUN/DNS/routes orchestration and Wintun remain unchanged.
+- Existing fail-closed Xray profile validation remains enabled during RC2 even though upstream security fixes are newer than the previous 26.3.27 baseline.
+
+## 4.5.0 Alpha 1 EXP1 FIX3
+
+## 4.5.0 Alpha 1 Engine Refresh RC1 — sing-box 1.14.1
+
+- Branched from the frozen EXP1 FIX4 baseline.
+- Updated only the sing-box candidate from 1.14.0 to official stable 1.14.1.
+- Xray remains pinned to 26.3.27 for isolation of regressions.
+- The builder verifies the official windows-amd64 release archive SHA-256 before extraction and verifies the extracted core reports sing-box 1.14.1.
+- TUN/DNS/routes/Control Plane/Direct Bridge algorithms are unchanged.
+
+
+- Added idempotent verification refresh for an already VERIFIED current session.
+- Added `verificationRefreshed` structured journal event and regression coverage for refresh + stale-session rejection.
+- Updated Switcher TUN WebRTC audit semantics: extension-origin local ICE is informational when TUN is VERIFIED and `raw-public=0`.
+- Clear stale transient Manager transition/endpoint/current-verification metadata after Manager/Direct Bridge loss while preserving fail-closed guard behavior.
+- Frozen 4.4.0 networking/TUN/DNS/core baseline remains unchanged.
+
+
+## 4.5.0 Alpha 1 EXP1 FIX2
+
+- Added session-bound verification guards: late verification results from an older session are ignored.
+- Added automatic post-start TUN exit verification (`manager-tun-auto`) without changing frozen TUN/DNS/core algorithms.
+- Direct Bridge verified-exit metadata now comes only from the active Control Plane session; legacy profile `LastExitIp` / `LastTestUtc` are no longer advertised as current route verification.
+- Added regression test for stale-session verification rejection.
+
+## 4.5.0 Alpha 1 EXP1 FIX1
+
+- Fixed live JSONL journal readability on Windows by releasing the append handle after every event.
+- Cleaned new ControlPlane analyzer warnings without modifying the frozen 4.4.0 networking baseline.
+﻿# GeniaProxy 4.5.0 Alpha 1 EXP1 — State Machine & Session Journal
+
+- Started the 4.5 control-plane over the frozen 4.4.0 Final Stable Direct Bridge network baseline.
+- Added explicit connection lifecycle states and guarded legal transitions.
+- Added per-connection session IDs; verified exit data never carries into a new session.
+- Added append-only JSONL structured session journal under `data/diagnostics`.
+- Existing Manager channel test now promotes the current control-plane session to `verified` only on a successful result with a concrete exit IP.
+- Added read-only control-plane fields to Diagnostics; no TUN/DNS/routes/core algorithms were changed.
+- Authenticated Direct Bridge and Route Coherence v2 remain deferred to later Alpha 1 experiments.
+
 # GeniaProxy 4.4.0 Final Stable Direct Bridge
 
 - Promoted the validated Direct Bridge EXP2/FIX3 branch to Final Stable without changing the frozen 4.3.3 network/TUN/Xray baseline.
@@ -310,3 +370,10 @@ Final v3 cleanup (2026-08-14)
 - Important core errors remain visible; failed config checks dump full core output.
 - The journal context menu can toggle "Подробный журнал ядра" for new messages.
 - Network behavior and validated engine binaries are otherwise unchanged.
+
+## 4.5.0 Alpha 1 EXP1 FIX4
+- Startup Recovery Hardening after TUN crash/restart testing.
+- Early startup JSONL diagnostics before MainWindow.
+- ACK-based single-instance activation with safe takeover attempt and visible unresponsive-primary warning.
+- Pre-UI pending TUN recovery check for administrator launches.
+- Protocol Lab capability boundary added for AnyTLS, TUIC, Snell, Whitelist Mode and Xray experimental work; all remain disabled in Alpha 1.

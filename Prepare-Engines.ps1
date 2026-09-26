@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param()
 
 $ErrorActionPreference = "Stop"
@@ -6,7 +6,7 @@ Set-StrictMode -Version Latest
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $EngineDirectory = Join-Path $Root "engine"
-$PrepareSingBox = Join-Path $Root "Prepare-SingBox-1.14.0.ps1"
+$PrepareSingBox = Join-Path $Root "Prepare-SingBox-1.14.1.ps1"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 $XrayUrl = "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-windows-64.zip"
@@ -100,7 +100,7 @@ function Install-FromArchive {
 }
 
 if (-not (Test-Path -LiteralPath $PrepareSingBox)) {
-    throw "Prepare-SingBox-1.14.0.ps1 was not found."
+    throw "Prepare-SingBox-1.14.1.ps1 was not found."
 }
 
 New-Item -ItemType Directory -Path $EngineDirectory -Force | Out-Null

@@ -10,7 +10,7 @@ namespace GeniaProxy.Services
     public sealed class BrowserIntegrationService
     {
         public const string SwitcherVersion = "5.6.0";
-        public const string SwitcherManifestVersion = "5.6.0.6";
+        public const string SwitcherManifestVersion = "5.6.0.7";
         public const string BridgeVersion = "direct-1-exp2";
 
         public static string BundledRoot => Path.Combine(

@@ -1,6 +1,11 @@
+using System.IO.Pipes;
 using System.Net;
+using System.Reflection;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json.Nodes;
+using GeniaProxy.ControlPlane;
 using GeniaProxy.Models;
 using GeniaProxy.Services;
 
@@ -8,8 +13,13 @@ namespace GeniaProxy.Tests
 {
     internal static class Program
     {
-        private static int Main()
+        private static int Main(string[] args)
         {
+            if (TryRunProtocolLabProbe(args, out int probeExitCode))
+            {
+                return probeExitCode;
+            }
+
             (string Name, Action Test)[] tests =
             [
                 ("Импорт Hysteria2", CreateHysteria2Config),
@@ -43,7 +53,34 @@ namespace GeniaProxy.Tests
                 ("Отклонение инъекции в TUN snapshot", RejectMaliciousTunSnapshot),
                 ("Отклонение чужой TUN topology", RejectUnexpectedTunSnapshotTopology),
                 ("Разбор проверки канала", ParseConnectionTrace),
-                ("Отчёт privacy probe", FormatPrivacyReport)
+                ("Отчёт privacy probe", FormatPrivacyReport),
+                ("Control Plane lifecycle", ValidateControlPlaneLifecycle),
+                ("Control Plane session isolation", ValidateControlPlaneSessionIsolation),
+                ("Control Plane stale session guard", ValidateControlPlaneStaleSessionGuard),
+                ("Control Plane verification refresh", ValidateControlPlaneVerificationRefresh),
+                ("Control Plane refresh stale-session guard", ValidateControlPlaneRefreshStaleSessionGuard),
+                ("Control Plane transition guard", ValidateControlPlaneTransitionGuard),
+                ("Startup journal live-readable", ValidateStartupJournalLiveReadable),
+                ("Single-instance activation ACK", ValidateSingleInstanceActivationAck),
+                ("Single-instance UAC pipe security", ValidateSingleInstanceActivationPipeSecurity),
+                ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary),
+                ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel),
+                ("Protocol Lab AnyTLS selection gate", ValidateProtocolLabAnyTlsSelectionGate),
+                ("Protocol Lab TUIC selection gate", ValidateProtocolLabTuicSelectionGate),
+                ("Protocol Lab Snell selection gate", ValidateProtocolLabSnellSelectionGate),
+                ("Protocol Lab AnyTLS config", ValidateProtocolLabAnyTlsConfig),
+                ("Protocol Lab AnyTLS validation", ValidateProtocolLabAnyTlsValidation),
+                ("Protocol Lab AnyTLS trusted certificate", ValidateProtocolLabAnyTlsTrustedCertificate),
+                ("Protocol Lab TUIC config", ValidateProtocolLabTuicConfig),
+                ("Protocol Lab TUIC validation", ValidateProtocolLabTuicValidation),
+                ("Protocol Lab Snell v6 config", ValidateProtocolLabSnellConfig),
+                ("Protocol Lab Snell v6 validation", ValidateProtocolLabSnellValidation),
+                ("Protocol Lab whitelist boundary", ValidateProtocolLabWhitelistBoundary),
+                ("Protocol Lab whitelist activation blocked", ValidateProtocolLabWhitelistActivationBlocked),
+                ("Protocol Lab Xray experimental boundary", ValidateProtocolLabXrayExperimentalBoundary),
+                ("Protocol Lab Xray experimental activation blocked", ValidateProtocolLabXrayExperimentalActivationBlocked),
+                ("Protocol Lab selection audit", ValidateProtocolLabSelectionAudit),
+                ("Protocol Lab local-proxy isolation", ValidateProtocolLabLocalProxyIsolation)
             ];
 
             int failed = 0;
@@ -70,6 +107,235 @@ namespace GeniaProxy.Tests
             );
 
             return failed == 0 ? 0 : 1;
+        }
+
+        private static bool TryRunProtocolLabProbe(
+            string[] args,
+            out int exitCode)
+        {
+            exitCode = 0;
+
+            if (args.Length == 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                string json;
+                string outputPath;
+
+                if (args.Length == 2 &&
+                    args[0].Equals(
+                        "--write-anytls-config",
+                        StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+                    json =
+                        ProtocolLabAnyTlsConfigService
+                            .CreateLocalProxyConfig(
+                                "example.com",
+                                443,
+                                "protocol-lab-test",
+                                "example.com",
+                                2080
+                            );
+                }
+                else if (args.Length == 5 &&
+                         args[0].Equals(
+                             "--write-anytls-runtime-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int serverPort) ||
+                        !int.TryParse(args[3], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Runtime probe ports must be integers."
+                        );
+                    }
+
+                    json =
+                        ProtocolLabAnyTlsConfigService
+                            .CreateLocalProxyConfig(
+                                "127.0.0.1",
+                                serverPort,
+                                "protocol-lab-loopback-secret",
+                                "localhost",
+                                localPort,
+                                allowInsecureTls: false,
+                                trustedCertificatePath: args[4]
+                            );
+                }
+                else if (args.Length == 2 &&
+                         args[0].Equals(
+                             "--write-tuic-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    json =
+                        ProtocolLabTuicConfigService
+                            .CreateLocalProxyConfig(
+                                "example.com",
+                                443,
+                                "11111111-2222-3333-4444-555555555555",
+                                "protocol-lab-test",
+                                "example.com",
+                                2080
+                            );
+                }
+                else if (args.Length == 5 &&
+                         args[0].Equals(
+                             "--write-tuic-runtime-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int serverPort) ||
+                        !int.TryParse(args[3], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Runtime probe ports must be integers."
+                        );
+                    }
+
+                    json =
+                        ProtocolLabTuicConfigService
+                            .CreateLocalProxyConfig(
+                                "127.0.0.1",
+                                serverPort,
+                                "11111111-2222-3333-4444-555555555555",
+                                "protocol-lab-loopback-secret",
+                                "localhost",
+                                localPort,
+                                allowInsecureTls: false,
+                                trustedCertificatePath: args[4]
+                            );
+                }
+                else if (args.Length == 2 &&
+                         args[0].Equals(
+                             "--write-snell-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    json =
+                        ProtocolLabSnellConfigService
+                            .CreateLocalProxyConfig(
+                                "example.com",
+                                443,
+                                "protocol-lab-snell-psk",
+                                2080
+                            );
+                }
+                else if (args.Length == 4 &&
+                         args[0].Equals(
+                             "--write-snell-runtime-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int serverPort) ||
+                        !int.TryParse(args[3], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Runtime probe ports must be integers."
+                        );
+                    }
+
+                    json =
+                        ProtocolLabSnellConfigService
+                            .CreateLocalProxyConfig(
+                                "127.0.0.1",
+                                serverPort,
+                                "protocol-lab-snell-psk",
+                                localPort
+                            );
+                }
+                else if (args.Length == 3 &&
+                         args[0].Equals(
+                             "--write-stable-singbox-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Stable sing-box probe port must be an integer."
+                        );
+                    }
+
+                    json =
+                        Hysteria2ImportService
+                            .CreateSingBoxConfig(
+                                "hysteria2://protocol-lab-test@" +
+                                "127.0.0.1:65534" +
+                                "?sni=example.com",
+                                localPort
+                            );
+                }
+                else if (args.Length == 3 &&
+                         args[0].Equals(
+                             "--write-stable-xray-config",
+                             StringComparison.Ordinal))
+                {
+                    outputPath = args[1];
+
+                    if (!int.TryParse(args[2], out int localPort))
+                    {
+                        throw new FormatException(
+                            "Stable Xray probe port must be an integer."
+                        );
+                    }
+
+                    const string stableProbeUuid =
+                        "11111111-2222-3333-4444-555555555555";
+
+                    json =
+                        XrayProfileImportService
+                            .CreateVlessXhttpConfig(
+                                $"vless://{stableProbeUuid}@" +
+                                "127.0.0.1:65534" +
+                                "?encryption=none&security=tls" +
+                                "&sni=example.com&type=xhttp" +
+                                "&path=%2Fstable-smoke" +
+                                "&mode=stream-one",
+                                localPort
+                            );
+                }
+                else
+                {
+                    Console.Error.WriteLine(
+                        "Неизвестный режим тестового probe."
+                    );
+                    exitCode = 2;
+                    return true;
+                }
+
+                File.WriteAllText(
+                    outputPath,
+                    json,
+                    new UTF8Encoding(
+                        encoderShouldEmitUTF8Identifier: false
+                    )
+                );
+
+                Console.WriteLine(
+                    "Protocol Lab config written: " +
+                    Path.GetFullPath(outputPath)
+                );
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                exitCode = 1;
+                return true;
+            }
         }
 
         private static void CreateHysteria2Config()
@@ -179,7 +445,7 @@ namespace GeniaProxy.Tests
         private static void ValidateBrowserIntegrationMetadata()
         {
             AssertEqual("5.6.0", BrowserIntegrationService.SwitcherVersion);
-            AssertEqual("5.6.0.6", BrowserIntegrationService.SwitcherManifestVersion);
+            AssertEqual("5.6.0.7", BrowserIntegrationService.SwitcherManifestVersion);
             AssertEqual("direct-1-exp2", BrowserIntegrationService.BridgeVersion);
             AssertEqual(47831, BrowserDirectBridgeService.Port);
             AssertEqual(1, BrowserDirectBridgeService.ProtocolVersion);
@@ -1576,6 +1842,1625 @@ namespace GeniaProxy.Tests
                     "DNS-интерфейсы Windows",
                     StringComparison.Ordinal
                 )
+            );
+        }
+
+        private static void ValidateControlPlaneLifecycle()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath,
+                    TimeSpan.FromMinutes(5)
+                );
+
+                coordinator.BeginSessionAsync(
+                    "alpha-profile",
+                    "tun"
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(
+                    ConnectionState.Connecting,
+                    coordinator.Snapshot.State
+                );
+
+                coordinator.MarkNetworkReadyAsync(
+                    "xray",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(
+                    ConnectionState.TunWarmup,
+                    coordinator.Snapshot.State
+                );
+
+                coordinator.MarkVerificationStartedAsync(
+                    "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                coordinator.MarkVerifiedAsync(
+                    "203.0.113.10",
+                    expectedExit: null,
+                    source: "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                ControlPlaneSnapshot verified = coordinator.Snapshot;
+                AssertEqual(ConnectionState.Verified, verified.State);
+                AssertEqual("203.0.113.10", verified.VerifiedExit);
+                AssertEqual(true, verified.VerificationSucceeded);
+                AssertEqual(true, verified.VerificationFresh);
+
+                coordinator.BeginDisconnectAsync(
+                    "test-disconnect"
+                ).GetAwaiter().GetResult();
+                coordinator.CompleteDisconnectAsync(
+                    "test-disconnect-complete"
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(
+                    ConnectionState.Idle,
+                    coordinator.Snapshot.State
+                );
+
+                string journal = File.ReadAllText(journalPath);
+                AssertEqual(
+                    true,
+                    journal.Contains(
+                        "sessionStarted",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+                AssertEqual(
+                    true,
+                    journal.Contains(
+                        "verificationSucceeded",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+                AssertEqual(
+                    true,
+                    journal.Contains(
+                        "sessionStopped",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneSessionIsolation()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath
+                );
+
+                coordinator.BeginSessionAsync(
+                    "profile-one",
+                    "local"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "local",
+                    tunMode: false
+                ).GetAwaiter().GetResult();
+                coordinator.MarkVerifiedAsync(
+                    "198.51.100.20",
+                    expectedExit: null,
+                    source: "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                Guid firstSession = coordinator.Snapshot.SessionId;
+
+                coordinator.CompleteDisconnectAsync(
+                    "first-session-complete"
+                ).GetAwaiter().GetResult();
+
+                coordinator.BeginSessionAsync(
+                    "profile-two",
+                    "local"
+                ).GetAwaiter().GetResult();
+
+                ControlPlaneSnapshot second = coordinator.Snapshot;
+                AssertEqual(false, firstSession == second.SessionId);
+                AssertEqual<string?>(null, second.VerifiedExit);
+                AssertEqual<DateTimeOffset?>(null, second.VerifiedAtUtc);
+                AssertEqual<bool?>(null, second.VerificationSucceeded);
+                AssertEqual(false, second.VerificationFresh);
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneStaleSessionGuard()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath
+                );
+
+                coordinator.BeginSessionAsync(
+                    "old-session",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+
+                Guid staleSessionId = coordinator.Snapshot.SessionId;
+
+                coordinator.BeginSessionAsync(
+                    "new-session",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+
+                Guid currentSessionId = coordinator.Snapshot.SessionId;
+                AssertEqual(false, staleSessionId == currentSessionId);
+
+                bool staleStarted = coordinator
+                    .MarkVerificationStartedAsync(
+                        staleSessionId,
+                        "manager-tun-auto"
+                    ).GetAwaiter().GetResult();
+                bool staleApplied = coordinator
+                    .MarkVerifiedAsync(
+                        staleSessionId,
+                        "192.0.2.90",
+                        expectedExit: null,
+                        source: "manager-tun-auto"
+                    ).GetAwaiter().GetResult();
+
+                AssertEqual(false, staleStarted);
+                AssertEqual(false, staleApplied);
+                AssertEqual(
+                    ConnectionState.TunWarmup,
+                    coordinator.Snapshot.State
+                );
+                AssertEqual<string?>(
+                    null,
+                    coordinator.Snapshot.VerifiedExit
+                );
+
+                bool currentStarted = coordinator
+                    .MarkVerificationStartedAsync(
+                        currentSessionId,
+                        "manager-tun-auto"
+                    ).GetAwaiter().GetResult();
+                bool currentApplied = coordinator
+                    .MarkVerifiedAsync(
+                        currentSessionId,
+                        "198.51.100.77",
+                        expectedExit: null,
+                        source: "manager-tun-auto"
+                    ).GetAwaiter().GetResult();
+
+                AssertEqual(true, currentStarted);
+                AssertEqual(true, currentApplied);
+                AssertEqual(
+                    ConnectionState.Verified,
+                    coordinator.Snapshot.State
+                );
+                AssertEqual(
+                    "198.51.100.77",
+                    coordinator.Snapshot.VerifiedExit
+                );
+                AssertEqual(
+                    "manager-tun-auto",
+                    coordinator.Snapshot.VerificationSource
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneVerificationRefresh()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath,
+                    TimeSpan.FromMinutes(5)
+                );
+
+                coordinator.BeginSessionAsync(
+                    "refresh-profile",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+
+                Guid sessionId = coordinator.Snapshot.SessionId;
+                bool automaticApplied = coordinator.MarkVerifiedAsync(
+                    sessionId,
+                    "198.51.100.77",
+                    expectedExit: null,
+                    source: "manager-tun-auto"
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(true, automaticApplied);
+                ControlPlaneSnapshot automatic = coordinator.Snapshot;
+                AssertEqual(ConnectionState.Verified, automatic.State);
+                DateTimeOffset verifiedStateSince = automatic.StateSinceUtc;
+                DateTimeOffset firstVerifiedAt = automatic.VerifiedAtUtc!.Value;
+
+                Thread.Sleep(10);
+
+                bool started = coordinator.MarkVerificationStartedAsync(
+                    sessionId,
+                    "manager-channel-test"
+                ).GetAwaiter().GetResult();
+                bool refreshed = coordinator.MarkVerifiedAsync(
+                    sessionId,
+                    "198.51.100.88",
+                    expectedExit: null,
+                    source: "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                ControlPlaneSnapshot snapshot = coordinator.Snapshot;
+                AssertEqual(true, started);
+                AssertEqual(true, refreshed);
+                AssertEqual(sessionId, snapshot.SessionId);
+                AssertEqual(ConnectionState.Verified, snapshot.State);
+                AssertEqual(verifiedStateSince, snapshot.StateSinceUtc);
+                AssertEqual("198.51.100.88", snapshot.VerifiedExit);
+                AssertEqual("manager-channel-test", snapshot.VerificationSource);
+                AssertEqual(true, snapshot.VerifiedAtUtc > firstVerifiedAt);
+                AssertEqual(true, snapshot.VerificationFresh);
+
+                string journal = File.ReadAllText(journalPath);
+                AssertEqual(
+                    true,
+                    journal.Contains(
+                        "verificationRefreshed",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneRefreshStaleSessionGuard()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(journalPath);
+
+                coordinator.BeginSessionAsync(
+                    "old-refresh-session",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+                Guid staleSessionId = coordinator.Snapshot.SessionId;
+                coordinator.MarkVerifiedAsync(
+                    staleSessionId,
+                    "192.0.2.10",
+                    expectedExit: null,
+                    source: "manager-tun-auto"
+                ).GetAwaiter().GetResult();
+
+                coordinator.BeginSessionAsync(
+                    "new-refresh-session",
+                    "tun"
+                ).GetAwaiter().GetResult();
+                coordinator.MarkNetworkReadyAsync(
+                    "sing-box",
+                    "tun",
+                    tunMode: true
+                ).GetAwaiter().GetResult();
+                Guid currentSessionId = coordinator.Snapshot.SessionId;
+                coordinator.MarkVerifiedAsync(
+                    currentSessionId,
+                    "198.51.100.40",
+                    expectedExit: null,
+                    source: "manager-tun-auto"
+                ).GetAwaiter().GetResult();
+
+                DateTimeOffset? currentVerifiedAt = coordinator.Snapshot.VerifiedAtUtc;
+                bool staleRefresh = coordinator.MarkVerifiedAsync(
+                    staleSessionId,
+                    "203.0.113.99",
+                    expectedExit: null,
+                    source: "manager-channel-test"
+                ).GetAwaiter().GetResult();
+
+                AssertEqual(false, staleRefresh);
+                AssertEqual(currentSessionId, coordinator.Snapshot.SessionId);
+                AssertEqual("198.51.100.40", coordinator.Snapshot.VerifiedExit);
+                AssertEqual(currentVerifiedAt, coordinator.Snapshot.VerifiedAtUtc);
+                AssertEqual("manager-tun-auto", coordinator.Snapshot.VerificationSource);
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateControlPlaneTransitionGuard()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "session-journal.jsonl"
+            );
+
+            try
+            {
+                using var coordinator = new ControlPlaneCoordinator(
+                    journalPath
+                );
+
+                coordinator.BeginSessionAsync(
+                    "guard-profile",
+                    "local"
+                ).GetAwaiter().GetResult();
+
+                AssertThrows<InvalidOperationException>(() =>
+                    coordinator.MarkVerifiedAsync(
+                        "192.0.2.44",
+                        expectedExit: null,
+                        source: "invalid-early-verification"
+                    ).GetAwaiter().GetResult()
+                );
+
+                AssertEqual(
+                    ConnectionState.Connecting,
+                    coordinator.Snapshot.State
+                );
+                AssertEqual<string?>(
+                    null,
+                    coordinator.Snapshot.VerifiedExit
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+
+        private static void ValidateStartupJournalLiveReadable()
+        {
+            string directory = CreateTestDirectory();
+            string journalPath = Path.Combine(
+                directory,
+                "startup-journal.jsonl"
+            );
+
+            try
+            {
+                var journal = new StartupJournal(journalPath);
+                Guid attemptId = Guid.NewGuid();
+
+                AssertEqual(
+                    true,
+                    journal.TryAppend(
+                        "startup.test",
+                        attemptId,
+                        new Dictionary<string, object?>
+                        {
+                            ["phase"] = "unit"
+                        }
+                    )
+                );
+
+                using FileStream reader = new(
+                    journalPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete
+                );
+
+                AssertEqual(
+                    true,
+                    journal.TryAppend(
+                        "startup.test.second",
+                        attemptId
+                    )
+                );
+
+                reader.Position = 0;
+                using var textReader = new StreamReader(
+                    reader,
+                    Encoding.UTF8,
+                    detectEncodingFromByteOrderMarks: true,
+                    bufferSize: 1024,
+                    leaveOpen: true
+                );
+
+                string content = textReader.ReadToEnd();
+
+                AssertEqual(
+                    true,
+                    content.Contains(
+                        "startup.test",
+                        StringComparison.Ordinal
+                    )
+                );
+            }
+            finally
+            {
+                DeleteTestDirectory(directory);
+            }
+        }
+
+        private static void ValidateSingleInstanceActivationAck()
+        {
+            string applicationId =
+                "GeniaProxy.Tests." + Guid.NewGuid().ToString("N");
+
+            using var primary = new SingleInstanceService(applicationId);
+
+            AssertEqual(true, primary.IsPrimaryInstance);
+
+            using var activated = new ManualResetEventSlim(false);
+
+            primary.ActivationRequested +=
+                (_, _) => activated.Set();
+
+            primary.StartListening();
+
+            Thread.Sleep(100);
+
+            using var secondary = new SingleInstanceService(applicationId);
+
+            AssertEqual(false, secondary.IsPrimaryInstance);
+
+            bool acknowledged = secondary.TryActivatePrimary(
+                TimeSpan.FromSeconds(2),
+                out string? errorMessage
+            );
+
+            AssertEqual(true, acknowledged);
+            AssertEqual<string?>(null, errorMessage);
+            AssertEqual(
+                true,
+                activated.Wait(TimeSpan.FromSeconds(2))
+            );
+        }
+
+        private static void ValidateSingleInstanceActivationPipeSecurity()
+        {
+            MethodInfo? method = typeof(SingleInstanceService)
+                .GetMethod(
+                    "CreateActivationPipeSecurity",
+                    BindingFlags.NonPublic | BindingFlags.Static
+                );
+
+            AssertNotNull(method);
+
+            var security = method!.Invoke(null, null) as PipeSecurity;
+
+            AssertNotNull(security);
+            AssertEqual(true, security!.AreAccessRulesProtected);
+
+            SecurityIdentifier currentUser =
+                WindowsIdentity.GetCurrent().User
+                ?? throw new Exception(
+                    "Не удалось определить SID текущего пользователя."
+                );
+
+            AuthorizationRuleCollection rules =
+                security.GetAccessRules(
+                    includeExplicit: true,
+                    includeInherited: false,
+                    targetType: typeof(SecurityIdentifier)
+                );
+
+            PipeAccessRule[] allowRules = rules
+                .Cast<PipeAccessRule>()
+                .Where(rule =>
+                    rule.AccessControlType ==
+                        AccessControlType.Allow)
+                .ToArray();
+
+            AssertEqual(1, allowRules.Length);
+            AssertEqual(
+                currentUser.Value,
+                ((SecurityIdentifier)allowRules[0]
+                    .IdentityReference).Value
+            );
+
+            PipeAccessRights rights =
+                allowRules[0].PipeAccessRights;
+
+            AssertEqual(
+                true,
+                (rights & PipeAccessRights.ReadWrite) ==
+                    PipeAccessRights.ReadWrite
+            );
+
+            AssertEqual(
+                true,
+                (rights & PipeAccessRights.ChangePermissions) != 0
+            );
+
+            AssertEqual(
+                true,
+                (rights & PipeAccessRights.TakeOwnership) != 0
+            );
+        }
+
+        private static void ValidateProtocolLabBoundary()
+        {
+            ProtocolLabFeatureCatalog.ThrowIfAlpha1BoundaryViolated();
+
+            AssertEqual(
+                true,
+                ProtocolLabFeatureCatalog.Alpha1BoundaryIsSafe
+            );
+
+            string[] required =
+            [
+                "anytls",
+                "tuic",
+                "snell",
+                "whitelist-mode",
+                "xray-experimental"
+            ];
+
+            foreach (string id in required)
+            {
+                FeatureCapability? capability =
+                    ProtocolLabFeatureCatalog.All
+                        .FirstOrDefault(item =>
+                            item.Id.Equals(
+                                id,
+                                StringComparison.Ordinal
+                            ));
+
+                AssertNotNull(capability);
+                AssertEqual(
+                    FeatureLane.ProtocolLab,
+                    capability!.Lane
+                );
+                AssertEqual(false, capability.EnabledByDefault);
+            }
+        }
+
+        private static void ValidateProtocolLabCapabilityModel()
+        {
+            ProtocolLabFeatureCatalog.ThrowIfDefaultBoundaryViolated();
+
+            AssertEqual(
+                true,
+                ProtocolLabFeatureCatalog.DefaultBoundaryIsSafe
+            );
+
+            FeatureCapability anyTls =
+                ProtocolLabFeatureCatalog.Find("anytls")
+                ?? throw new Exception("AnyTLS capability отсутствует.");
+
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                anyTls.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.RuntimeVerified,
+                anyTls.SupportState
+            );
+            AssertEqual(true, anyTls.SelectableInProtocolLab);
+
+            FeatureCapability tuic =
+                ProtocolLabFeatureCatalog.Find("TUIC")
+                ?? throw new Exception("TUIC capability отсутствует.");
+
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                tuic.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.RuntimeVerified,
+                tuic.SupportState
+            );
+            AssertEqual(true, tuic.SelectableInProtocolLab);
+
+            FeatureCapability snell =
+                ProtocolLabFeatureCatalog.Find("snell")
+                ?? throw new Exception("Snell capability отсутствует.");
+
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                snell.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.RuntimeVerified,
+                snell.SupportState
+            );
+            AssertEqual(true, snell.SelectableInProtocolLab);
+
+            FeatureCapability whitelist =
+                ProtocolLabFeatureCatalog.Find("whitelist-mode")
+                ?? throw new Exception(
+                    "Whitelist capability отсутствует."
+                );
+
+            AssertEqual(
+                ProtocolLabEngineFamily.Host,
+                whitelist.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.DesignOnly,
+                whitelist.SupportState
+            );
+            AssertEqual(false, whitelist.SelectableInProtocolLab);
+
+            FeatureCapability xrayExperimental =
+                ProtocolLabFeatureCatalog.Find("xray-experimental")
+                ?? throw new Exception(
+                    "Xray experimental capability отсутствует."
+                );
+
+            AssertEqual(
+                ProtocolLabEngineFamily.Xray,
+                xrayExperimental.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.DesignOnly,
+                xrayExperimental.SupportState
+            );
+            AssertEqual(
+                false,
+                xrayExperimental.SelectableInProtocolLab
+            );
+
+            AssertEqual<FeatureCapability?>(
+                null,
+                ProtocolLabFeatureCatalog.Find("unknown")
+            );
+
+            FeatureCapability selectableSnell =
+                ProtocolLabFeatureCatalog.RequireSelectable("snell");
+
+            AssertEqual("snell", selectableSnell.Id);
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable("unknown")
+            );
+        }
+
+        private static void ValidateProtocolLabAnyTlsSelectionGate()
+        {
+            FeatureCapability capability =
+                ProtocolLabFeatureCatalog.RequireSelectable("ANYTLS");
+
+            AssertEqual("anytls", capability.Id);
+            AssertEqual(
+                FeatureLane.ProtocolLab,
+                capability.Lane
+            );
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                capability.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.RuntimeVerified,
+                capability.SupportState
+            );
+            AssertEqual(false, capability.EnabledByDefault);
+            AssertEqual(true, capability.SelectableInProtocolLab);
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "whitelist-mode"
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "xray-experimental"
+                )
+            );
+        }
+
+        private static void ValidateProtocolLabTuicSelectionGate()
+        {
+            FeatureCapability capability =
+                ProtocolLabFeatureCatalog.RequireSelectable("TUIC");
+
+            AssertEqual("tuic", capability.Id);
+            AssertEqual(
+                FeatureLane.ProtocolLab,
+                capability.Lane
+            );
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                capability.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.RuntimeVerified,
+                capability.SupportState
+            );
+            AssertEqual(false, capability.EnabledByDefault);
+            AssertEqual(true, capability.SelectableInProtocolLab);
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "whitelist-mode"
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "xray-experimental"
+                )
+            );
+        }
+
+        private static void ValidateProtocolLabSnellSelectionGate()
+        {
+            FeatureCapability capability =
+                ProtocolLabFeatureCatalog.RequireSelectable("SNELL");
+
+            AssertEqual("snell", capability.Id);
+            AssertEqual(
+                FeatureLane.ProtocolLab,
+                capability.Lane
+            );
+            AssertEqual(
+                ProtocolLabEngineFamily.SingBox,
+                capability.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.RuntimeVerified,
+                capability.SupportState
+            );
+            AssertEqual(false, capability.EnabledByDefault);
+            AssertEqual(true, capability.SelectableInProtocolLab);
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "whitelist-mode"
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "xray-experimental"
+                )
+            );
+        }
+
+        private static void ValidateProtocolLabAnyTlsConfig()
+        {
+            string json =
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "secret",
+                    "tls.example.com",
+                    2080
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)?.AsObject()
+                ?? throw new Exception(
+                    "Не создан AnyTLS JSON."
+                );
+
+            JsonObject inbound =
+                root["inbounds"]?[0]?.AsObject()
+                ?? throw new Exception(
+                    "Не создан AnyTLS mixed inbound."
+                );
+
+            AssertEqual(
+                "127.0.0.1",
+                inbound["listen"]?.GetValue<string>()
+            );
+            AssertEqual(
+                2080,
+                inbound["listen_port"]?.GetValue<int>()
+            );
+
+            JsonObject outbound =
+                root["outbounds"]?[0]?.AsObject()
+                ?? throw new Exception(
+                    "Не создан AnyTLS outbound."
+                );
+
+            AssertEqual(
+                "anytls",
+                outbound["type"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "edge.example.com",
+                outbound["server"]?.GetValue<string>()
+            );
+            AssertEqual(
+                443,
+                outbound["server_port"]?.GetValue<int>()
+            );
+            AssertEqual(
+                "secret",
+                outbound["password"]?.GetValue<string>()
+            );
+            AssertEqual(
+                string.Empty,
+                outbound["client_metadata"]?.GetValue<string>()
+            );
+            AssertEqual(
+                true,
+                outbound["tls"]?["enabled"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "tls.example.com",
+                outbound["tls"]?["server_name"]
+                    ?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound["tls"]?["insecure"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "proxy",
+                root["route"]?["final"]?.GetValue<string>()
+            );
+        }
+
+        private static void ValidateProtocolLabAnyTlsValidation()
+        {
+            AssertThrows<ArgumentException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "",
+                    443,
+                    "secret",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentOutOfRangeException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    0,
+                    "secret",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentOutOfRangeException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "secret",
+                    null,
+                    70000
+                )
+            );
+
+            AssertThrows<FormatException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com\ninvalid",
+                    443,
+                    "secret",
+                    null,
+                    2080
+                )
+            );
+
+            string insecureJson =
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "secret",
+                    null,
+                    2080,
+                    allowInsecureTls: true
+                );
+
+            JsonObject insecureRoot =
+                JsonNode.Parse(insecureJson)!.AsObject();
+
+            AssertEqual(
+                "edge.example.com",
+                insecureRoot["outbounds"]?[0]?["tls"]?
+                    ["server_name"]?.GetValue<string>()
+            );
+            AssertEqual(
+                true,
+                insecureRoot["outbounds"]?[0]?["tls"]?
+                    ["insecure"]?.GetValue<bool>()
+            );
+        }
+
+        private static void ValidateProtocolLabAnyTlsTrustedCertificate()
+        {
+            string json =
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "127.0.0.1",
+                    4443,
+                    "secret",
+                    "localhost",
+                    2080,
+                    allowInsecureTls: false,
+                    trustedCertificatePath:
+                        @"C:\ProtocolLab\loopback-cert.pem"
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)!.AsObject();
+
+            AssertEqual(
+                false,
+                root["outbounds"]?[0]?["tls"]?
+                    ["insecure"]?.GetValue<bool>()
+            );
+
+            AssertEqual(
+                @"C:\ProtocolLab\loopback-cert.pem",
+                root["outbounds"]?[0]?["tls"]?
+                    ["certificate_path"]?.GetValue<string>()
+            );
+
+            AssertThrows<FormatException>(() =>
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "127.0.0.1",
+                    4443,
+                    "secret",
+                    "localhost",
+                    2080,
+                    allowInsecureTls: false,
+                    trustedCertificatePath:
+                        "C:\\ProtocolLab\\bad\ncert.pem"
+                )
+            );
+        }
+
+        private static void ValidateProtocolLabTuicConfig()
+        {
+            string json =
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    "tls.example.com",
+                    2080
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)?.AsObject()
+                ?? throw new Exception(
+                    "Не создан TUIC JSON."
+                );
+
+            JsonObject outbound =
+                root["outbounds"]?[0]?.AsObject()
+                ?? throw new Exception(
+                    "Не создан TUIC outbound."
+                );
+
+            AssertEqual(
+                "tuic",
+                outbound["type"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "edge.example.com",
+                outbound["server"]?.GetValue<string>()
+            );
+            AssertEqual(
+                443,
+                outbound["server_port"]?.GetValue<int>()
+            );
+            AssertEqual(
+                "11111111-2222-3333-4444-555555555555",
+                outbound["uuid"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "secret",
+                outbound["password"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "cubic",
+                outbound["congestion_control"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "native",
+                outbound["udp_relay_mode"]?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound["zero_rtt_handshake"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "10s",
+                outbound["heartbeat"]?.GetValue<string>()
+            );
+            AssertEqual(
+                true,
+                outbound["tls"]?["enabled"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "tls.example.com",
+                outbound["tls"]?["server_name"]
+                    ?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound["tls"]?["insecure"]?.GetValue<bool>()
+            );
+        }
+
+        private static void ValidateProtocolLabTuicValidation()
+        {
+            AssertThrows<FormatException>(() =>
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "not-a-uuid",
+                    "secret",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentException>(() =>
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "",
+                    null,
+                    2080
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    null,
+                    2080,
+                    congestionControl: "invalid"
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    null,
+                    2080,
+                    udpRelayMode: "invalid"
+                )
+            );
+
+            string json =
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "127.0.0.1",
+                    4443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    "localhost",
+                    2080,
+                    allowInsecureTls: false,
+                    trustedCertificatePath:
+                        @"C:\ProtocolLab\tuic-cert.pem"
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)!.AsObject();
+
+            AssertEqual(
+                @"C:\ProtocolLab\tuic-cert.pem",
+                root["outbounds"]?[0]?["tls"]?
+                    ["certificate_path"]?.GetValue<string>()
+            );
+        }
+
+        private static void ValidateProtocolLabSnellConfig()
+        {
+            string json =
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "123456789012",
+                    2080
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)?.AsObject()
+                ?? throw new Exception(
+                    "Не создан Snell JSON."
+                );
+
+            JsonObject outbound =
+                root["outbounds"]?[0]?.AsObject()
+                ?? throw new Exception(
+                    "Не создан Snell outbound."
+                );
+
+            AssertEqual(
+                "snell",
+                outbound["type"]?.GetValue<string>()
+            );
+            AssertEqual(
+                6,
+                outbound["version"]?.GetValue<int>()
+            );
+            AssertEqual(
+                "edge.example.com",
+                outbound["server"]?.GetValue<string>()
+            );
+            AssertEqual(
+                443,
+                outbound["server_port"]?.GetValue<int>()
+            );
+            AssertEqual(
+                "123456789012",
+                outbound["psk"]?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound["reuse"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "default",
+                outbound["mode"]?.GetValue<string>()
+            );
+            AssertEqual(
+                false,
+                outbound.ContainsKey("network")
+            );
+            AssertEqual(
+                false,
+                outbound.ContainsKey("userkey")
+            );
+        }
+
+        private static void ValidateProtocolLabSnellValidation()
+        {
+            AssertThrows<FormatException>(() =>
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "short",
+                    2080
+                )
+            );
+
+            AssertThrows<ArgumentOutOfRangeException>(() =>
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    0,
+                    "123456789012",
+                    2080
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "123456789012",
+                    2080,
+                    mode: "invalid"
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "123456789012",
+                    2080,
+                    network: "icmp"
+                )
+            );
+
+            string json =
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "127.0.0.1",
+                    8443,
+                    "123456789012",
+                    2080,
+                    mode: "unshaped",
+                    network: "tcp",
+                    reuse: true,
+                    userKey: "lab-user-key"
+                );
+
+            JsonObject root =
+                JsonNode.Parse(json)!.AsObject();
+
+            AssertEqual(
+                "unshaped",
+                root["outbounds"]?[0]?["mode"]?.GetValue<string>()
+            );
+            AssertEqual(
+                "tcp",
+                root["outbounds"]?[0]?["network"]?.GetValue<string>()
+            );
+            AssertEqual(
+                true,
+                root["outbounds"]?[0]?["reuse"]?.GetValue<bool>()
+            );
+            AssertEqual(
+                "lab-user-key",
+                root["outbounds"]?[0]?["userkey"]?.GetValue<string>()
+            );
+        }
+
+        private static void ValidateProtocolLabWhitelistBoundary()
+        {
+            ProtocolLabWhitelistModeBoundary.ValidateBoundary();
+
+            WhitelistModeBoundary boundary =
+                ProtocolLabWhitelistModeBoundary.Current;
+
+            AssertEqual(
+                WhitelistModeImplementationState.DesignOnly,
+                boundary.State
+            );
+            AssertEqual(false, boundary.Selectable);
+            AssertEqual(
+                false,
+                boundary.MayModifyStableConnectionPath
+            );
+            AssertEqual(false, boundary.MayModifySystemRoutes);
+            AssertEqual(false, boundary.MayModifySystemDns);
+            AssertEqual(
+                false,
+                boundary.MayUseThirdPartyServiceImpersonation
+            );
+            AssertEqual(
+                true,
+                boundary.RequiresExplicitExperimentalOptIn
+            );
+
+            FeatureCapability capability =
+                ProtocolLabFeatureCatalog.Find("whitelist-mode")
+                ?? throw new Exception(
+                    "Whitelist capability отсутствует."
+                );
+
+            AssertEqual(
+                ProtocolLabSupportState.DesignOnly,
+                capability.SupportState
+            );
+            AssertEqual(false, capability.EnabledByDefault);
+            AssertEqual(false, capability.SelectableInProtocolLab);
+        }
+
+        private static void ValidateProtocolLabWhitelistActivationBlocked()
+        {
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabWhitelistModeBoundary
+                    .ThrowIfRuntimeActivationRequested()
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "whitelist-mode"
+                )
+            );
+        }
+
+        private static void ValidateProtocolLabXrayExperimentalBoundary()
+        {
+            ProtocolLabXrayExperimentalBoundary.ValidateBoundary();
+
+            XrayExperimentalBoundary boundary =
+                ProtocolLabXrayExperimentalBoundary.Current;
+
+            AssertEqual(
+                XrayExperimentalImplementationState.DesignOnly,
+                boundary.State
+            );
+            AssertEqual(false, boundary.Selectable);
+            AssertEqual(
+                false,
+                boundary.MayReplaceStablePinnedEngine
+            );
+            AssertEqual(
+                false,
+                boundary.MayReuseStableProfilePathWithoutValidation
+            );
+            AssertEqual(
+                false,
+                boundary.MayRelaxStableProfileHardening
+            );
+            AssertEqual(true, boundary.RequiresSeparateEnginePin);
+            AssertEqual(true, boundary.RequiresEngineHashVerification);
+            AssertEqual(true, boundary.RequiresSeparateRuntimeEvidence);
+            AssertEqual(
+                true,
+                boundary.RequiresExplicitExperimentalOptIn
+            );
+
+            FeatureCapability capability =
+                ProtocolLabFeatureCatalog.Find("xray-experimental")
+                ?? throw new Exception(
+                    "Xray experimental capability отсутствует."
+                );
+
+            AssertEqual(
+                ProtocolLabEngineFamily.Xray,
+                capability.EngineFamily
+            );
+            AssertEqual(
+                ProtocolLabSupportState.DesignOnly,
+                capability.SupportState
+            );
+            AssertEqual(false, capability.EnabledByDefault);
+            AssertEqual(false, capability.SelectableInProtocolLab);
+        }
+
+        private static void ValidateProtocolLabXrayExperimentalActivationBlocked()
+        {
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabXrayExperimentalBoundary
+                    .ThrowIfRuntimeActivationRequested()
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabFeatureCatalog.RequireSelectable(
+                    "xray-experimental"
+                )
+            );
+        }
+
+        private static void ValidateProtocolLabSelectionAudit()
+        {
+            string anyTls =
+                ProtocolLabSelectionAudit.CreateLogLine("ANYTLS");
+
+            AssertEqual(
+                true,
+                anyTls.Contains(
+                    "id=anytls",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                true,
+                anyTls.Contains(
+                    "engine=SingBox",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                true,
+                anyTls.Contains(
+                    "support=RuntimeVerified",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                false,
+                anyTls.Contains(
+                    "password",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+            AssertEqual(
+                false,
+                anyTls.Contains(
+                    "server=",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+
+            const string privateServer =
+                "private-audit.example.test";
+            const string privateSecret =
+                "AUDIT_SECRET_DO_NOT_LOG";
+
+            string? emitted = null;
+
+            void Capture(string message)
+            {
+                emitted = message;
+            }
+
+            ProtocolLabSelectionAudit.SelectionLogged += Capture;
+
+            try
+            {
+                _ = ProtocolLabAnyTlsConfigService
+                    .CreateLocalProxyConfig(
+                        privateServer,
+                        443,
+                        privateSecret,
+                        privateServer,
+                        2080
+                    );
+            }
+            finally
+            {
+                ProtocolLabSelectionAudit.SelectionLogged -= Capture;
+            }
+
+            AssertEqual(false, string.IsNullOrWhiteSpace(emitted));
+            AssertEqual(
+                true,
+                emitted!.Contains(
+                    "id=anytls",
+                    StringComparison.Ordinal
+                )
+            );
+            AssertEqual(
+                false,
+                emitted.Contains(
+                    privateServer,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+            AssertEqual(
+                false,
+                emitted.Contains(
+                    privateSecret,
+                    StringComparison.Ordinal
+                )
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabSelectionAudit.CreateLogLine("unknown")
+            );
+        }
+
+        private static void ValidateProtocolLabLocalProxyIsolation()
+        {
+            string anyTls =
+                ProtocolLabAnyTlsConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "secret",
+                    "edge.example.com",
+                    2080
+                );
+
+            string tuic =
+                ProtocolLabTuicConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "11111111-2222-3333-4444-555555555555",
+                    "secret",
+                    "edge.example.com",
+                    2081
+                );
+
+            string snell =
+                ProtocolLabSnellConfigService.CreateLocalProxyConfig(
+                    "edge.example.com",
+                    443,
+                    "123456789012",
+                    2082
+                );
+
+            ProtocolLabConfigSafetyService
+                .ValidateLocalProxyIsolation("anytls", anyTls);
+
+            ProtocolLabConfigSafetyService
+                .ValidateLocalProxyIsolation("tuic", tuic);
+
+            ProtocolLabConfigSafetyService
+                .ValidateLocalProxyIsolation("snell", snell);
+
+            const string unsafeTun = """
+                {
+                  "inbounds": [
+                    {
+                      "type": "tun",
+                      "tag": "tun-in",
+                      "interface_name": "GeniaProxy"
+                    }
+                  ],
+                  "outbounds": [
+                    {
+                      "type": "direct",
+                      "tag": "direct"
+                    }
+                  ]
+                }
+                """;
+
+            AssertThrows<InvalidDataException>(() =>
+                ProtocolLabConfigSafetyService
+                    .ValidateLocalProxyIsolation(
+                        "anytls",
+                        unsafeTun
+                    )
+            );
+
+            const string unsafeSystemProxy = """
+                {
+                  "inbounds": [
+                    {
+                      "type": "mixed",
+                      "tag": "mixed-in",
+                      "listen": "127.0.0.1",
+                      "listen_port": 2080,
+                      "set_system_proxy": true
+                    }
+                  ],
+                  "outbounds": [
+                    {
+                      "type": "direct",
+                      "tag": "direct"
+                    }
+                  ]
+                }
+                """;
+
+            AssertThrows<InvalidDataException>(() =>
+                ProtocolLabConfigSafetyService
+                    .ValidateLocalProxyIsolation(
+                        "tuic",
+                        unsafeSystemProxy
+                    )
             );
         }
 

@@ -9,8 +9,11 @@ const CONFIG = Object.freeze({
   PROXY_HOST: "127.0.0.1",
   DEFAULT_PORT: 2080,
   DEFAULT_PROFILE: "GeniaProxy / NekoBox / Hysteria / VLESS",
-  DEFAULT_TRUSTED_EXIT_IPS: Object.freeze([]),
-  TRUSTED_EXIT_META: Object.freeze({}),
+  DEFAULT_TRUSTED_EXIT_IPS: Object.freeze(["83.147.232.178", "46.8.182.247"]),
+  TRUSTED_EXIT_META: Object.freeze({
+    "83.147.232.178": Object.freeze({ name: "Netherlands", expectedCountry: "NL", expectedTimeZone: "Europe/Amsterdam" }),
+    "46.8.182.247": Object.freeze({ name: "Germany", expectedCountry: "DE", expectedTimeZone: "Europe/Berlin" })
+  }),
   TRACE_URL: "https://1.1.1.1/cdn-cgi/trace",
   FALLBACK_URL: "https://www.gstatic.com/generate_204",
   HEALTH_TIMEOUT_MS: 7000,
@@ -1007,14 +1010,14 @@ async function applyManagerStatus(message, source = "direct-http") {
     managerBridgeGoVersion: parsed.goVersion,
     managerProfile: parsed.profile,
     managerEngine: parsed.engine,
-    managerMode: parsed.mode,
-    managerLocalProxy: parsed.localProxy,
-    managerEndpoint: parsed.endpoint,
-    managerExpectedExitIp: parsed.expectedExitIp,
-    managerVerifiedExitIp: parsed.verifiedExitIp,
-    managerVerifiedExitAt: parsed.verifiedExitAt,
-    managerVerifiedExitSucceeded: parsed.verifiedExitSucceeded,
-    managerUptimeSeconds: parsed.uptimeSeconds,
+    managerMode: parsed.connected ? parsed.mode : null,
+    managerLocalProxy: parsed.connected ? parsed.localProxy : null,
+    managerEndpoint: parsed.connected ? parsed.endpoint : null,
+    managerExpectedExitIp: parsed.connected ? parsed.expectedExitIp : null,
+    managerVerifiedExitIp: parsed.connected ? parsed.verifiedExitIp : null,
+    managerVerifiedExitAt: parsed.connected ? parsed.verifiedExitAt : null,
+    managerVerifiedExitSucceeded: parsed.connected ? parsed.verifiedExitSucceeded : null,
+    managerUptimeSeconds: parsed.connected ? parsed.uptimeSeconds : null,
     managerLastSeenAt: now,
     managerConnectAttemptAt: null,
     managerLastError: parsed.connected ? null : "Direct Bridge доступен; GeniaProxy Manager сейчас не подтверждён как активный.",
@@ -1027,8 +1030,8 @@ async function applyManagerStatus(message, source = "direct-http") {
       managerMonitorTraceLocation: null,
       managerMonitorTraceColo: null,
       managerCoherence: "unknown",
-      managerTransition: "to_tun",
-      managerTransitionStartedAt: now,
+      managerTransition: null,
+      managerTransitionStartedAt: null,
       lastStateTransitionAt: now,
       lastError: "GeniaProxy TUN остановлен/недоступен. Browser web traffic заблокирован до нового VERIFIED TUN или восстановления Local SOCKS."
     } : {})
@@ -1497,6 +1500,16 @@ async function disconnectManagerBridge() {
     managerBridgeConnected: false,
     managerConnectAttemptAt: null,
     managerLastError: null,
+    managerMode: null,
+    managerLocalProxy: null,
+    managerEndpoint: null,
+    managerExpectedExitIp: null,
+    managerVerifiedExitIp: null,
+    managerVerifiedExitAt: null,
+    managerVerifiedExitSucceeded: null,
+    managerUptimeSeconds: null,
+    managerTransition: null,
+    managerTransitionStartedAt: null,
     ...(detachedTun ? {
       managerMonitorStatus: "unreachable",
       managerMonitorObservedExitIp: null,
@@ -1506,8 +1519,8 @@ async function disconnectManagerBridge() {
       managerMonitorTraceLocation: null,
       managerMonitorTraceColo: null,
       managerCoherence: "unknown",
-      managerTransition: "to_tun",
-      managerTransitionStartedAt: Date.now(),
+      managerTransition: null,
+      managerTransitionStartedAt: null,
       lastStateTransitionAt: Date.now(),
       lastError: "Direct Bridge отключён во время TUN. Browser web traffic заблокирован до нового подтверждённого маршрута."
     } : {})
@@ -1553,6 +1566,14 @@ async function performManagerBridgeRefresh(reason, epoch) {
       managerConnectAttemptAt: null,
       managerLastError: `Direct Bridge недоступен: ${errorMessage(error)}`,
       ...(lostTunSession ? {
+        managerMode: null,
+        managerLocalProxy: null,
+        managerEndpoint: null,
+        managerExpectedExitIp: null,
+        managerVerifiedExitIp: null,
+        managerVerifiedExitAt: null,
+        managerVerifiedExitSucceeded: null,
+        managerUptimeSeconds: null,
         managerMonitorStatus: "unreachable",
         managerMonitorObservedExitIp: null,
         managerMonitorLastCheckAt: null,
@@ -1561,8 +1582,8 @@ async function performManagerBridgeRefresh(reason, epoch) {
         managerMonitorTraceLocation: null,
         managerMonitorTraceColo: null,
         managerCoherence: "unknown",
-        managerTransition: "to_tun",
-        managerTransitionStartedAt: Date.now(),
+        managerTransition: null,
+        managerTransitionStartedAt: null,
         lastStateTransitionAt: Date.now(),
         lastError: "Direct Bridge/TUN недоступен. Browser web traffic заблокирован до нового VERIFIED TUN или восстановления Local SOCKS."
       } : {})
@@ -2846,7 +2867,12 @@ async function recordSelfTest(payload) {
   const webRtcDetails = await getChromeSetting(chrome.privacy.network.webRTCIPHandlingPolicy);
   const predictionDetails = await getChromeSetting(chrome.privacy.network.networkPredictionEnabled);
   const targetWebRtc = desiredWebRtcPolicy(state);
+  const tunMonitor = state.managerBridgeConnected && state.managerMode === "tun" && !state.enabled;
   const proxyOk = state.enabled && proxyConfigMatches(proxyDetails, state) && proxyDetails.levelOfControl === "controlled_by_this_extension";
+  const browserProxyReleased = !proxyConfigMatches(proxyDetails, state) &&
+    proxyDetails.levelOfControl !== "controlled_by_other_extensions" &&
+    proxyDetails.levelOfControl !== "not_controllable";
+  const tunRouteVerified = tunMonitor && state.managerMonitorStatus === "verified";
   const webRtcOk = !state.webRtcShieldEnabled || (
     webRtcDetails.value === targetWebRtc &&
     webRtcDetails.levelOfControl === "controlled_by_this_extension"
@@ -2869,7 +2895,36 @@ async function recordSelfTest(payload) {
   let status = "passed";
   let summary = "Privacy Shield policy, ownership, SOCKS5 и network prediction подтверждены.";
 
-  if (!state.enabled) {
+  if (tunMonitor) {
+    if (!tunRouteVerified) {
+      status = "warning";
+      summary = "TUN Monitor активен, но системный маршрут ещё не подтверждён VERIFIED.";
+    }
+    else if (!browserProxyReleased || !webRtcOk || !predictionOk) {
+      status = "failed";
+      summary = "TUN VERIFIED, но browser proxy release или обязательные Privacy Shield настройки не подтверждены.";
+    }
+    else if (state.webRtcCompatibility) {
+      status = "warning";
+      summary = "TUN VERIFIED; Compatibility Mode активен и намеренно слабее Maximum protection.";
+    }
+    else if (!state.webRtcShieldEnabled) {
+      status = "warning";
+      summary = "TUN VERIFIED, но WebRTC Shield отключён вручную.";
+    }
+    else if (publicRawCandidates > 0) {
+      status = "warning";
+      summary = `TUN VERIFIED; extension-origin ICE увидел public=${publicRawCandidates}. Это не website leak verdict, но требует отдельной проверки.`;
+    }
+    else {
+      const iceInfo = iceCandidates === 0
+        ? "Extension-origin ICE: кандидатов нет."
+        : `Extension-origin ICE (справочно): total=${iceCandidates}, mDNS=${mdnsCandidates}, local=${localRawCandidates}, public=${publicRawCandidates}, safe=${safeSpecialCandidates}, host UDP=${hostUdpCandidates}, host TCP=${hostTcpCandidates}, unknown=${unknownCandidates}.`;
+      status = "passed";
+      summary = `TUN Privacy Shield подтверждён: системный маршрут VERIFIED, browser SOCKS освобождён, public ICE не обнаружен. ${iceInfo}`;
+    }
+  }
+  else if (!state.enabled) {
     status = "warning";
     summary = "Прокси выключен; проверка показывает только текущее состояние WebRTC в контексте расширения.";
   }

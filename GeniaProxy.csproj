@@ -13,11 +13,11 @@
 		<ApplicationIcon>assets\GeniaProxy.ico</ApplicationIcon>
 		<AssemblyName>GeniaProxy</AssemblyName>
 		<Product>GeniaProxy</Product>
-		<Version>4.4.0</Version>
-		<FileVersion>4.4.0.0</FileVersion>
-		<AssemblyVersion>4.4.0.0</AssemblyVersion>
+		<Version>4.5.0</Version>
+		<FileVersion>4.5.0.12</FileVersion>
+		<AssemblyVersion>4.5.0.0</AssemblyVersion>
 		<Authors>Genia</Authors>
-		<Description>GeniaProxy 4.4.0 Final Stable Direct Bridge — browser integration hosted inside GeniaProxy.exe with no NativeHost helper; frozen 4.3.3 network/TUN baseline.</Description>
+		<Description>GeniaProxy 4.5.0 Alpha 2 Protocol Lab - isolated AnyTLS, TUIC and Snell v6 validation over Xray 26.3.27 + sing-box 1.14.1.</Description>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -33,8 +33,10 @@
 	<ItemGroup>
 		<None Remove="engine\sing-box.exe" />
 		<None Remove="engine\sing-box.sha256" />
+		<None Remove="engine\sing-box.provenance.txt" />
 		<None Remove="engine\xray.exe" />
 		<None Remove="engine\xray.sha256" />
+		<None Remove="engine\xray.provenance.txt" />
 		<None Remove="engine\wintun.dll" />
 		<None Remove="engine\wintun.sha256" />
 		<None Remove="engine\XRAY-LICENSE.txt" />
@@ -46,6 +48,17 @@
 		<None Remove="README-4.4.0-FINAL-STABLE-DIRECT-BRIDGE.md" />
 		<None Remove="SECURITY-4.4.0-FINAL-STABLE-DIRECT-BRIDGE.md" />
 		<None Remove="RELEASE-4.4.0-FINAL-STABLE-DIRECT-BRIDGE.txt" />
+		<None Remove="README-4.5.0-A1-EXP1.md" />
+		<None Remove="RELEASE-4.5.0-A1-EXP1.txt" />
+		<None Remove="PROTOCOL-LAB-BOUNDARY.md" />
+		<None Remove="PROTOCOL-LAB-ALPHA2-STATUS.md" />
+		<None Remove="PROTOCOL-LAB-WHITELIST-BOUNDARY.md" />
+		<None Remove="PROTOCOL-LAB-XRAY-EXPERIMENTAL-BOUNDARY.md" />
+		<None Remove="ENGINE-REFRESH-RC1.md" />
+		<None Remove="ENGINE-REFRESH-RC3.md" />
+		<None Remove="RC3-TIMING-AB.md" />
+		<None Remove="RUN-TIMING-A.cmd" />
+		<None Remove="RUN-TIMING-B-150MS.cmd" />
 
 
 		<Content Include="engine\sing-box.exe">
@@ -60,6 +73,37 @@
 			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
 		</Content>
 
+		<Content Include="engine\sing-box.provenance.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+
+		<Content Include="ENGINE-REFRESH-RC1.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="ENGINE-REFRESH-RC3.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="RC3-TIMING-AB.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="RUN-TIMING-A.cmd">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="RUN-TIMING-B-150MS.cmd">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
 		<Content Include="engine\xray.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
@@ -67,6 +111,12 @@
 		</Content>
 
 		<Content Include="engine\xray.sha256">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+
+		<Content Include="engine\xray.provenance.txt">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
@@ -133,6 +183,36 @@
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</Content>
 
+		<Content Include="README-4.5.0-A1-EXP1.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="RELEASE-4.5.0-A1-EXP1.txt">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="PROTOCOL-LAB-BOUNDARY.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="PROTOCOL-LAB-ALPHA2-STATUS.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="PROTOCOL-LAB-WHITELIST-BOUNDARY.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
+		<Content Include="PROTOCOL-LAB-XRAY-EXPERIMENTAL-BOUNDARY.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+
 	</ItemGroup>
 
 	<!-- Рабочие профили, настройки и временные файлы никогда
@@ -151,6 +231,8 @@
 		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\xray.exe" />
 		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\xray.sha256')"
 		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\xray.sha256" />
+		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\xray.provenance.txt')"
+		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\xray.provenance.txt" />
 		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\wintun.dll')"
 		       Text="Не найден файл: $(MSBuildProjectDirectory)\engine\wintun.dll" />
 		<Error Condition="!Exists('$(MSBuildProjectDirectory)\engine\wintun.sha256')"

@@ -1,4 +1,5 @@
-﻿using GeniaProxy.Models;
+using GeniaProxy.ControlPlane;
+using GeniaProxy.Models;
 using GeniaProxy.Services;
 using System.ComponentModel;
 using System.Globalization;
@@ -35,6 +36,7 @@ namespace GeniaProxy
         private readonly SettingsService settingsService = new();
         private readonly BrowserIntegrationService browserIntegrationService = new();
         private readonly BrowserDirectBridgeService browserDirectBridgeService;
+        private readonly ControlPlaneCoordinator? controlPlaneCoordinator;
         private readonly DispatcherTimer sessionTimer = new()
         {
             Interval = TimeSpan.FromSeconds(1)
@@ -55,6 +57,7 @@ namespace GeniaProxy
         private double expandedWindowHeight = DefaultExpandedWindowHeight;
         private int reconnectGeneration;
         private int endpointResolutionGeneration;
+        private CancellationTokenSource? controlPlaneVerificationCancellation;
         private bool isOperationBusy;
         private bool isApplyingProfileSettings;
         private string? activeSettingsProfile;
@@ -70,6 +73,24 @@ namespace GeniaProxy
             InitializeComponent();
             InitializeTray();
 
+            try
+            {
+                controlPlaneCoordinator = new ControlPlaneCoordinator(
+                    Path.Combine(
+                        AppContext.BaseDirectory,
+                        "data",
+                        "diagnostics",
+                        "session-journal.jsonl"
+                    )
+                );
+            }
+            catch
+            {
+                // Alpha 1 observability must never prevent the frozen
+                // 4.4.0 networking baseline from starting.
+                controlPlaneCoordinator = null;
+            }
+
             connectionSession.LogReceived +=
                 ConnectionSession_LogReceived;
 
@@ -78,6 +99,9 @@ namespace GeniaProxy
 
             connectionSession.UnexpectedExit +=
                 ConnectionSession_UnexpectedExit;
+
+            ProtocolLabSelectionAudit.SelectionLogged +=
+                ProtocolLabSelectionAudit_SelectionLogged;
 
             sessionTimer.Tick += (_, _) =>
                 UpdateSessionTime();
@@ -132,7 +156,11 @@ namespace GeniaProxy
                 UpdateState(ConnectionSessionState.Stopped);
                 UpdateElevationBadge();
 
-                AddLog("GeniaProxy 4.4.0 Final Stable Direct Bridge запущен.");
+                AddLog("GeniaProxy 4.5.0 Alpha 2 Protocol Lab (Xray 26.3.27 / sing-box 1.14.1) запущен.");
+                AddLog(
+                    $"DNS readiness baseline: mode {TimingAbExperiment.Mode}; " +
+                    $"barrier before direct UDP DNS probe = {TimingAbExperiment.BarrierMilliseconds} ms."
+                );
                 AddLog(
                     "Режим прав: " +
                     (WindowsElevationService.IsAdministrator
@@ -142,6 +170,10 @@ namespace GeniaProxy
                 AddLog(
                     "Папка профилей: " +
                     connectionSession.ProfilesDirectory
+                );
+
+                AddLog(
+                    "Protocol Lab Alpha 2: AnyTLS/TUIC/Snell v6 runtime-verified; Whitelist/Xray experimental design-only; Lab-возможности отключены по умолчанию."
                 );
 
                 try
@@ -415,7 +447,16 @@ namespace GeniaProxy
 
             try
             {
+                CancelControlPlaneVerification();
                 SaveSettings(profileName, localPort);
+
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.BeginSessionAsync(
+                        profileName,
+                        FormatControlPlaneMode(connectionMode)
+                    ),
+                    "begin-session"
+                );
 
                 await connectionSession.StartAsync(
                     profileName,
@@ -425,15 +466,43 @@ namespace GeniaProxy
                     settings.TunStackPreference
                 );
 
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.MarkNetworkReadyAsync(
+                        FormatControlPlaneCore(connectionSession.ActiveCore),
+                        FormatControlPlaneMode(connectionMode),
+                        connectionMode == ConnectionMode.Tun
+                    ),
+                    "network-ready"
+                );
+
+                if (connectionMode == ConnectionMode.Tun)
+                {
+                    StartAutomaticTunControlPlaneVerification();
+                }
+
                 sessionTimer.Start();
                 UpdateSessionTime();
             }
             catch (OperationCanceledException)
             {
+                CancelControlPlaneVerification();
+                await TryControlPlaneAsync(
+                    () => RecoverAndCompleteControlPlaneAsync(
+                        "start-cancelled"
+                    ),
+                    "start-cancelled"
+                );
                 AddLog("Запуск отменён.");
             }
             catch (Exception ex)
             {
+                CancelControlPlaneVerification();
+                await TryControlPlaneAsync(
+                    () => RecoverAndCompleteControlPlaneAsync(
+                        "start-failed"
+                    ),
+                    "start-failed"
+                );
                 AddLog("Ошибка запуска: " + ex.Message);
 
                 string target = connectionMode switch
@@ -687,10 +756,32 @@ namespace GeniaProxy
 
             try
             {
+                CancelControlPlaneVerification();
+
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.BeginDisconnectAsync(
+                        "user-disconnect"
+                    ),
+                    "disconnect-start"
+                );
+
                 await connectionSession.StopAsync();
+
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.CompleteDisconnectAsync(
+                        "network-cleanup-complete"
+                    ),
+                    "disconnect-complete"
+                );
             }
             catch (Exception ex)
             {
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.BeginRecoveryAsync(
+                        "disconnect-failed"
+                    ),
+                    "disconnect-recovery"
+                );
                 AddLog("Ошибка остановки: " + ex.Message);
 
                 System.Windows.MessageBox.Show(
@@ -736,9 +827,17 @@ namespace GeniaProxy
 
         private async Task HandleUnexpectedExitAsync(int exitCode)
         {
+            CancelControlPlaneVerification();
             sessionTimer.Stop();
             UpdateSessionTime();
             SetOperationUi(isBusy: false);
+
+            await TryControlPlaneAsync(
+                () => controlPlaneCoordinator!.BeginRecoveryAsync(
+                    $"core-exit-{exitCode}"
+                ),
+                "unexpected-core-exit"
+            );
 
             if (closeInProgress || resourcesDisposed)
             {
@@ -747,6 +846,13 @@ namespace GeniaProxy
 
             if (!settings.ReconnectOnFailure)
             {
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.CompleteRecoveryAsync(
+                        "reconnect-disabled"
+                    ),
+                    "recovery-complete"
+                );
+
                 System.Windows.MessageBox.Show(
                     this,
                     "Процесс ядра неожиданно завершился " +
@@ -771,6 +877,13 @@ namespace GeniaProxy
 
             if (recentCoreFailures.Count > 3)
             {
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.CompleteRecoveryAsync(
+                        "reconnect-circuit-breaker"
+                    ),
+                    "recovery-circuit-breaker"
+                );
+
                 AddLog(
                     "Автопереподключение остановлено: " +
                     "более трёх сбоев за две минуты."
@@ -1938,6 +2051,10 @@ namespace GeniaProxy
                         .FirstOrDefault()
                         ?.InformationalVersion ?? "не определена";
 
+                ControlPlaneSnapshot controlPlane =
+                    controlPlaneCoordinator?.Snapshot ??
+                    ControlPlaneSnapshot.Empty;
+
                 diagnostics = string.Join(
                     Environment.NewLine,
                     "GeniaProxy — диагностика",
@@ -1956,6 +2073,28 @@ namespace GeniaProxy
                         (connectionSession.UsesSystemProxy
                             ? "включён"
                             : "выключен"),
+                    string.Empty,
+                    "Control Plane Alpha 1",
+                    $"State: {controlPlane.State}",
+                    $"Session ID: " +
+                        (controlPlane.SessionId == Guid.Empty
+                            ? "—"
+                            : controlPlane.SessionId.ToString("D")),
+                    $"State since UTC: " +
+                        (controlPlane.StateSinceUtc == DateTimeOffset.MinValue
+                            ? "—"
+                            : controlPlane.StateSinceUtc.ToString("O", CultureInfo.InvariantCulture)),
+                    $"Profile: {controlPlane.ProfileName ?? "—"}",
+                    $"Core: {controlPlane.Core ?? "—"}",
+                    $"Mode: {controlPlane.Mode ?? "—"}",
+                    $"Verified exit: {controlPlane.VerifiedExit ?? "—"}",
+                    $"Verified at UTC: " +
+                        (controlPlane.VerifiedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? "—"),
+                    $"Verification succeeded: " +
+                        (controlPlane.VerificationSucceeded?.ToString() ?? "—"),
+                    $"Verification fresh: {controlPlane.VerificationFresh}",
+                    $"Verification source: {controlPlane.VerificationSource ?? "—"}",
+                    $"Last reason: {controlPlane.LastReason ?? "—"}",
                     string.Empty,
                     $"sing-box: {core.Version}",
                     $"sing-box SHA-256: {core.Sha256}",
@@ -2007,6 +2146,17 @@ namespace GeniaProxy
 
             SetOperationUi(isBusy: true);
 
+            Guid verificationSessionId =
+                controlPlaneCoordinator?.Snapshot.SessionId ?? Guid.Empty;
+
+            await TryControlPlaneAsync(
+                () => controlPlaneCoordinator!.MarkVerificationStartedAsync(
+                    verificationSessionId,
+                    "manager-channel-test"
+                ),
+                "verification-start"
+            );
+
             try
             {
                 using var cancellation = new CancellationTokenSource(
@@ -2028,6 +2178,31 @@ namespace GeniaProxy
                     result.AverageParallelMilliseconds;
                 profileSettings.LastExitIp = result.ExitIp;
                 SaveCurrentSettings();
+
+                if (result.IsSuccess &&
+                    !string.IsNullOrWhiteSpace(result.ExitIp))
+                {
+                    await TryControlPlaneAsync(
+                        () => controlPlaneCoordinator!.MarkVerifiedAsync(
+                            verificationSessionId,
+                            result.ExitIp,
+                            expectedExit: null,
+                            source: "manager-channel-test"
+                        ),
+                        "verification-success"
+                    );
+                }
+                else
+                {
+                    await TryControlPlaneAsync(
+                        () => controlPlaneCoordinator!.MarkVerificationFailedAsync(
+                            verificationSessionId,
+                            "channel-test-not-successful",
+                            "manager-channel-test"
+                        ),
+                        "verification-failed"
+                    );
+                }
 
                 ExitIpValueText.Text = string.IsNullOrWhiteSpace(result.ExitIp)
                     ? "—"
@@ -2058,6 +2233,14 @@ namespace GeniaProxy
             }
             catch (Exception ex)
             {
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.MarkVerificationFailedAsync(
+                        verificationSessionId,
+                        "channel-test-exception",
+                        "manager-channel-test"
+                    ),
+                    "verification-exception"
+                );
                 AddLog("Ошибка проверки канала: " + ex.Message);
                 ShowWarning(
                     "Не удалось завершить проверку канала.\n\n" +
@@ -2136,21 +2319,46 @@ namespace GeniaProxy
                 }
             }
 
+            string? expectedExitIp = null;
             string? verifiedExitIp = null;
             string? verifiedExitAt = null;
             bool? verifiedExitSucceeded = null;
-            if (!string.IsNullOrWhiteSpace(profile) &&
-                settings.ProfileSettings.TryGetValue(
+
+            ControlPlaneSnapshot controlPlane =
+                controlPlaneCoordinator?.Snapshot ??
+                ControlPlaneSnapshot.Empty;
+
+            bool controlPlaneMatchesActiveSession =
+                connected &&
+                controlPlane.SessionId != Guid.Empty &&
+                string.Equals(
+                    controlPlane.ProfileName,
                     profile,
-                    out ProfileRuntimeSettings? profileSettings))
+                    StringComparison.Ordinal
+                ) &&
+                string.Equals(
+                    controlPlane.Mode,
+                    mode,
+                    StringComparison.Ordinal
+                );
+
+            if (controlPlaneMatchesActiveSession)
             {
+                expectedExitIp = string.IsNullOrWhiteSpace(
+                    controlPlane.ExpectedExit
+                )
+                    ? null
+                    : controlPlane.ExpectedExit.Trim();
+
                 verifiedExitSucceeded =
-                    profileSettings.LastTestSucceeded;
-                if (profileSettings.LastTestSucceeded == true &&
-                    !string.IsNullOrWhiteSpace(profileSettings.LastExitIp))
+                    controlPlane.VerificationSucceeded;
+
+                if (controlPlane.VerificationSucceeded == true &&
+                    !string.IsNullOrWhiteSpace(controlPlane.VerifiedExit) &&
+                    controlPlane.VerifiedAtUtc is DateTimeOffset verifiedAt)
                 {
-                    verifiedExitIp = profileSettings.LastExitIp.Trim();
-                    verifiedExitAt = profileSettings.LastTestUtc?
+                    verifiedExitIp = controlPlane.VerifiedExit.Trim();
+                    verifiedExitAt = verifiedAt
                         .ToUniversalTime()
                         .ToString("O", CultureInfo.InvariantCulture);
                 }
@@ -2169,7 +2377,7 @@ namespace GeniaProxy
                 Type: "status",
                 Protocol: BrowserDirectBridgeService.ProtocolVersion,
                 Connected: connected,
-                Version: "4.4.0",
+                Version: "4.5.0",
                 BridgeVersion: BrowserDirectBridgeService.BridgeVersion,
                 Engine: engine,
                 ExpectedEngine: engine,
@@ -2179,7 +2387,7 @@ namespace GeniaProxy
                 Mode: mode,
                 LocalProxy: localProxy,
                 Endpoint: endpoint,
-                ExpectedExitIp: verifiedExitIp,
+                ExpectedExitIp: expectedExitIp,
                 VerifiedExitIp: verifiedExitIp,
                 VerifiedExitAt: verifiedExitAt,
                 VerifiedExitSucceeded: verifiedExitSucceeded,
@@ -2615,6 +2823,20 @@ namespace GeniaProxy
                 settings.TunStackPreference;
         }
 
+        private void ProtocolLabSelectionAudit_SelectionLogged(
+            string message)
+        {
+            if (Dispatcher.CheckAccess())
+            {
+                AddLog(message);
+                return;
+            }
+
+            _ = Dispatcher.BeginInvoke(
+                new Action(() => AddLog(message))
+            );
+        }
+
         private void ShowWarning(string message)
         {
             System.Windows.MessageBox.Show(
@@ -2644,13 +2866,29 @@ namespace GeniaProxy
 
             closeInProgress = true;
             Interlocked.Increment(ref reconnectGeneration);
+            CancelControlPlaneVerification();
             SetOperationUi(isBusy: true);
             Title = "GeniaProxy — завершение работы";
             connectionSession.CancelCurrentOperation();
 
             try
             {
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.BeginDisconnectAsync(
+                        "application-close"
+                    ),
+                    "close-disconnect-start"
+                );
+
                 await connectionSession.StopAsync();
+
+                await TryControlPlaneAsync(
+                    () => controlPlaneCoordinator!.CompleteDisconnectAsync(
+                        "application-close-complete"
+                    ),
+                    "close-disconnect-complete"
+                );
+
                 SaveCurrentSettings();
             }
             catch (Exception ex)
@@ -2674,7 +2912,7 @@ namespace GeniaProxy
                 {
                     closeInProgress = false;
                     SetOperationUi(isBusy: false);
-                    Title = "GeniaProxy 4.4.0 Final Stable Direct Bridge";
+                    Title = $"GeniaProxy 4.5.0 Alpha 2 Protocol Lab [{TimingAbExperiment.Mode}]";
                     return;
                 }
             }
@@ -2696,6 +2934,231 @@ namespace GeniaProxy
             );
         }
 
+        private void StartAutomaticTunControlPlaneVerification()
+        {
+            if (controlPlaneCoordinator is null ||
+                connectionSession.ActiveMode != ConnectionMode.Tun ||
+                !connectionSession.IsRunning)
+            {
+                return;
+            }
+
+            CancelControlPlaneVerification();
+
+            Guid sessionId = controlPlaneCoordinator.Snapshot.SessionId;
+            if (sessionId == Guid.Empty)
+            {
+                return;
+            }
+
+            var cancellation = new CancellationTokenSource();
+            controlPlaneVerificationCancellation = cancellation;
+
+            _ = RunAutomaticTunControlPlaneVerificationAsync(
+                sessionId,
+                connectionSession.ActivePort,
+                cancellation
+            );
+        }
+
+        private async Task RunAutomaticTunControlPlaneVerificationAsync(
+            Guid sessionId,
+            int localPort,
+            CancellationTokenSource cancellation)
+        {
+            const string source = "manager-tun-auto";
+            CancellationToken token = cancellation.Token;
+
+            try
+            {
+                if (controlPlaneCoordinator is null)
+                {
+                    return;
+                }
+
+                bool started = await controlPlaneCoordinator
+                    .MarkVerificationStartedAsync(
+                        sessionId,
+                        source,
+                        token
+                    );
+
+                if (!started)
+                {
+                    return;
+                }
+
+                ConnectionTestResult result =
+                    await ConnectionTestService.RunAsync(
+                        localPort,
+                        ConnectionMode.Tun,
+                        parallelRequests: 1,
+                        cancellationToken: token
+                    );
+
+                if (result.IsSuccess &&
+                    !string.IsNullOrWhiteSpace(result.ExitIp))
+                {
+                    bool applied = await controlPlaneCoordinator
+                        .MarkVerifiedAsync(
+                            sessionId,
+                            result.ExitIp,
+                            expectedExit: null,
+                            source: source,
+                            cancellationToken: token
+                        );
+
+                    if (applied)
+                    {
+                        ExitIpValueText.Text = result.ExitIp;
+                        AddLog(
+                            "Control Plane TUN VERIFIED: " +
+                            $"exit {result.ExitIp}, " +
+                            $"{result.AverageParallelMilliseconds:F0} мс."
+                        );
+                    }
+                }
+                else
+                {
+                    bool applied = await controlPlaneCoordinator
+                        .MarkVerificationFailedAsync(
+                            sessionId,
+                            "tun-auto-verification-not-successful",
+                            source,
+                            token
+                        );
+
+                    if (applied)
+                    {
+                        AddLog(
+                            "Control Plane TUN: автоматическая проверка " +
+                            "exit пока не подтверждена."
+                        );
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Disconnect/reconnect cancels this session-bound probe.
+            }
+            catch (ObjectDisposedException)
+            {
+                // Application shutdown can dispose the coordinator while the
+                // diagnostic probe is being cancelled.
+            }
+            catch (Exception ex)
+            {
+                if (!token.IsCancellationRequested &&
+                    controlPlaneCoordinator is not null)
+                {
+                    try
+                    {
+                        bool applied = await controlPlaneCoordinator
+                            .MarkVerificationFailedAsync(
+                                sessionId,
+                                "tun-auto-verification-exception",
+                                source
+                            );
+
+                        if (applied)
+                        {
+                            AddLog(
+                                "Control Plane TUN verification: " +
+                                ex.Message
+                            );
+                        }
+                    }
+                    catch
+                    {
+                        // Observability must not affect the frozen network path.
+                    }
+                }
+            }
+            finally
+            {
+                _ = Interlocked.CompareExchange(
+                    ref controlPlaneVerificationCancellation,
+                    null,
+                    cancellation
+                );
+
+                cancellation.Dispose();
+            }
+        }
+
+        private void CancelControlPlaneVerification()
+        {
+            CancellationTokenSource? cancellation =
+                Interlocked.Exchange(
+                    ref controlPlaneVerificationCancellation,
+                    null
+                );
+
+            if (cancellation is null)
+            {
+                return;
+            }
+
+            try
+            {
+                cancellation.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        private async Task TryControlPlaneAsync(
+            Func<Task> operation,
+            string operationName)
+        {
+            if (controlPlaneCoordinator is null)
+            {
+                return;
+            }
+
+            try
+            {
+                await operation();
+            }
+            catch (Exception ex)
+            {
+                AddLog(
+                    $"Control Plane {operationName}: {ex.Message}"
+                );
+            }
+        }
+
+        private async Task RecoverAndCompleteControlPlaneAsync(
+            string reason)
+        {
+            if (controlPlaneCoordinator is null)
+            {
+                return;
+            }
+
+            await controlPlaneCoordinator.BeginRecoveryAsync(reason);
+            await controlPlaneCoordinator.CompleteRecoveryAsync(reason);
+        }
+
+        private static string FormatControlPlaneMode(
+            ConnectionMode mode) =>
+            mode switch
+            {
+                ConnectionMode.Tun => "tun",
+                ConnectionMode.SystemProxy => "system",
+                _ => "local"
+            };
+
+        private static string FormatControlPlaneCore(
+            ProxyCoreKind? core) =>
+            core switch
+            {
+                ProxyCoreKind.SingBox => "sing-box",
+                ProxyCoreKind.Xray => "xray",
+                _ => "unknown"
+            };
+
         public void Dispose()
         {
             if (resourcesDisposed)
@@ -2705,6 +3168,7 @@ namespace GeniaProxy
 
             resourcesDisposed = true;
             Interlocked.Increment(ref reconnectGeneration);
+            CancelControlPlaneVerification();
             sessionTimer.Stop();
 
             if (trayIcon is not null)
@@ -2724,7 +3188,17 @@ namespace GeniaProxy
                 ConnectionSession_StateChanged;
             connectionSession.UnexpectedExit -=
                 ConnectionSession_UnexpectedExit;
+            ProtocolLabSelectionAudit.SelectionLogged -=
+                ProtocolLabSelectionAudit_SelectionLogged;
             browserDirectBridgeService.Dispose();
+            try
+            {
+                controlPlaneCoordinator?.Dispose();
+            }
+            catch
+            {
+                // Diagnostics shutdown must not interfere with network cleanup.
+            }
             connectionSession.Dispose();
             GC.SuppressFinalize(this);
         }

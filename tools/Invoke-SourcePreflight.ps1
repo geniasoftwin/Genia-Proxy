@@ -25,6 +25,12 @@ $suspiciousNames = @(
     "credentials.json", "secrets.json"
 )
 
+$blockedRuntimeBinaryNames = @(
+    "sing-box.exe",
+    "xray.exe",
+    "wintun.dll"
+)
+
 $textExtensions = @(
     ".cs", ".csproj", ".sln", ".props", ".targets",
     ".ps1", ".psm1", ".psd1", ".cmd", ".bat",
@@ -167,6 +173,22 @@ Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
 Write-Host "Matched secret values are never printed."
 Write-Host ""
 
+# Runtime profile directories must never be present in a public-source import.
+# Unlike normal build/output folders, these are reported rather than silently
+# excluded so a leaked profile tree cannot pass unnoticed.
+$allDirectories = Get-ChildItem -LiteralPath $root -Recurse -Directory -Force
+
+foreach ($directory in $allDirectories) {
+    $relativeDirectory = Get-RelativePathCompat $directory.FullName
+
+    if (
+        $relativeDirectory -match '(?i)(^|[\\/])data[\\/]profiles($|[\\/])' -or
+        $relativeDirectory -match '(?i)(^|[\\/])profiles($|[\\/])'
+    ) {
+        Add-Finding -File $relativeDirectory -Line "-" -Rule "Runtime profile directory must not be published"
+    }
+}
+
 $files = Get-ChildItem -LiteralPath $root -Recurse -File -Force |
     Where-Object { -not (Test-ExcludedPath $_.FullName) }
 
@@ -174,6 +196,11 @@ foreach ($file in $files) {
     $relative = Get-RelativePathCompat $file.FullName
     $extension = $file.Extension.ToLowerInvariant()
     $name = $file.Name.ToLowerInvariant()
+
+    if ($blockedRuntimeBinaryNames -contains $name) {
+        Add-Finding -File $relative -Line "-" -Rule "Bundled runtime/engine binary must not be published"
+        continue
+    }
 
     if ($blockedExtensions -contains $extension) {
         Add-Finding -File $relative -Line "-" -Rule "Private key/certificate container file"

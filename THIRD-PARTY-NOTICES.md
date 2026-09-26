@@ -1,11 +1,11 @@
 # Сторонние компоненты
 
-## sing-box 1.14.0
+## sing-box 1.14.1
 
-GeniaProxy 4.4.0 использует официальный `sing-box.exe` как отдельное внешнее ядро процесса.
+GeniaProxy 4.5.0 Alpha 1 использует официальный `sing-box.exe` как отдельное внешнее ядро процесса.
 
 - проект: https://github.com/SagerNet/sing-box
-- релиз: https://github.com/SagerNet/sing-box/releases/tag/v1.14.0
+- релиз: https://github.com/SagerNet/sing-box/releases/tag/v1.14.1
 - лицензия: GNU GPL v3 or later
 - полный текст уведомления upstream: `engine\SING-BOX-LICENSE.txt`
 - GeniaProxy не заявляет аффилированность или одобрение со стороны SagerNet.
