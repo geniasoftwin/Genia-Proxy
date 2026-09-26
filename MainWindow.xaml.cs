@@ -156,7 +156,7 @@ namespace GeniaProxy
                 UpdateState(ConnectionSessionState.Stopped);
                 UpdateElevationBadge();
 
-                AddLog("GeniaProxy 4.5.0 Alpha 2 Protocol Lab (Xray 26.3.27 / sing-box 1.14.1) запущен.");
+                AddLog("GeniaProxy 4.5.0 Alpha 3 Protocol Lab UI (Xray 26.3.27 / sing-box 1.14.1) запущен.");
                 AddLog(
                     $"DNS readiness baseline: mode {TimingAbExperiment.Mode}; " +
                     $"barrier before direct UDP DNS probe = {TimingAbExperiment.BarrierMilliseconds} ms."
@@ -173,7 +173,7 @@ namespace GeniaProxy
                 );
 
                 AddLog(
-                    "Protocol Lab Alpha 2: AnyTLS/TUIC/Snell v6 runtime-verified; Whitelist/Xray experimental design-only; Lab-возможности отключены по умолчанию."
+                    "Protocol Lab Alpha 3: отдельный UI boundary; AnyTLS/TUIC/Snell v6 runtime-verified; Whitelist/Xray experimental design-only; Lab выключен по умолчанию."
                 );
 
                 try
@@ -1531,6 +1531,18 @@ namespace GeniaProxy
             ServicePopup.IsOpen = false;
             LoadProfiles();
             AddLog("Список профилей обновлён.");
+        }
+
+        private void ProtocolLabButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            var window = new ProtocolLabWindow
+            {
+                Owner = this
+            };
+
+            window.ShowDialog();
         }
 
         private void ServiceButton_Click(
@@ -2912,7 +2924,7 @@ namespace GeniaProxy
                 {
                     closeInProgress = false;
                     SetOperationUi(isBusy: false);
-                    Title = $"GeniaProxy 4.5.0 Alpha 2 Protocol Lab [{TimingAbExperiment.Mode}]";
+                    Title = $"GeniaProxy 4.5.0 Alpha 3 Protocol Lab [{TimingAbExperiment.Mode}]";
                     return;
                 }
             }
