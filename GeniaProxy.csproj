@@ -14,10 +14,10 @@
 		<AssemblyName>GeniaProxy</AssemblyName>
 		<Product>GeniaProxy</Product>
 		<Version>4.5.0</Version>
-		<FileVersion>4.5.0.12</FileVersion>
+		<FileVersion>4.5.0.13</FileVersion>
 		<AssemblyVersion>4.5.0.0</AssemblyVersion>
 		<Authors>Genia</Authors>
-		<Description>GeniaProxy 4.5.0 Alpha 2 Protocol Lab - isolated AnyTLS, TUIC and Snell v6 validation over Xray 26.3.27 + sing-box 1.14.1.</Description>
+		<Description>GeniaProxy 4.5.0 Alpha 3 Protocol Lab UI - isolated experimental capability selection over the frozen stable networking baseline.</Description>
 	</PropertyGroup>
 
 	<ItemGroup>
