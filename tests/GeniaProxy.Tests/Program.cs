@@ -2650,13 +2650,15 @@ namespace GeniaProxy.Tests
                 }
                 """;
 
+            int invalidConfigPort = GetAvailableLoopbackPort();
+
             using (var session = new ProtocolLabSession())
             {
                 AssertThrows<InvalidDataException>(() =>
                     session.StartAsync(
                         "anytls",
                         unsafeTun,
-                        21880
+                        invalidConfigPort
                     ).GetAwaiter().GetResult()
                 );
 
@@ -2669,6 +2671,8 @@ namespace GeniaProxy.Tests
                 AssertEqual(0, session.ActivePort);
             }
 
+            int stableBlockedPort = GetAvailableLoopbackPort();
+
             using (var stableBlocked =
                 new ProtocolLabSession(
                     stableSessionIsRunning: () => true
@@ -2678,7 +2682,7 @@ namespace GeniaProxy.Tests
                     stableBlocked.StartAsync(
                         "anytls",
                         unsafeTun,
-                        21881
+                        stableBlockedPort
                     ).GetAwaiter().GetResult()
                 );
 
@@ -2689,13 +2693,15 @@ namespace GeniaProxy.Tests
                 AssertEqual(false, stableBlocked.IsRunning);
             }
 
+            int unsupportedPort = GetAvailableLoopbackPort();
+
             using (var unsupported = new ProtocolLabSession())
             {
                 AssertThrows<NotSupportedException>(() =>
                     unsupported.StartAsync(
                         "whitelist-mode",
                         "{}",
-                        21882
+                        unsupportedPort
                     ).GetAwaiter().GetResult()
                 );
 
@@ -3590,6 +3596,25 @@ namespace GeniaProxy.Tests
                         unsafeSystemProxy
                     )
             );
+        }
+
+        private static int GetAvailableLoopbackPort()
+        {
+            var listener = new System.Net.Sockets.TcpListener(
+                IPAddress.Loopback,
+                0
+            );
+
+            listener.Start();
+
+            try
+            {
+                return ((IPEndPoint)listener.LocalEndpoint).Port;
+            }
+            finally
+            {
+                listener.Stop();
+            }
         }
 
         private static string CreateTestDirectory()
