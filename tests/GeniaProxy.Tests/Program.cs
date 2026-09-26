@@ -66,6 +66,7 @@ namespace GeniaProxy.Tests
                 ("Protocol Lab Alpha 1 boundary", ValidateProtocolLabBoundary),
                 ("Protocol Lab Alpha 2 capability model", ValidateProtocolLabCapabilityModel),
                 ("Protocol Lab Alpha 3 UI model", ValidateProtocolLabUiModel),
+                ("Protocol Lab Alpha 3 UI config builder", ValidateProtocolLabUiConfigBuilder),
                 ("Protocol Lab isolated session boundary", ValidateProtocolLabSessionBoundary),
                 ("Protocol Lab AnyTLS selection gate", ValidateProtocolLabAnyTlsSelectionGate),
                 ("Protocol Lab TUIC selection gate", ValidateProtocolLabTuicSelectionGate),
@@ -2627,6 +2628,80 @@ namespace GeniaProxy.Tests
             AssertEqual(
                 3,
                 items.Count(item => item.Selectable)
+            );
+        }
+
+        private static void ValidateProtocolLabUiConfigBuilder()
+        {
+            string anyTls = ProtocolLabUiConfigService.CreateConfig(
+                new ProtocolLabUiConnectionInput(
+                    "anytls",
+                    "edge.example.com",
+                    443,
+                    2088,
+                    "test-secret",
+                    TlsServerName: "edge.example.com"
+                )
+            );
+
+            string tuic = ProtocolLabUiConfigService.CreateConfig(
+                new ProtocolLabUiConnectionInput(
+                    "tuic",
+                    "edge.example.com",
+                    443,
+                    2089,
+                    "test-secret",
+                    TuicUuid:
+                        "11111111-2222-3333-4444-555555555555",
+                    TlsServerName: "edge.example.com"
+                )
+            );
+
+            string snell = ProtocolLabUiConfigService.CreateConfig(
+                new ProtocolLabUiConnectionInput(
+                    "snell",
+                    "edge.example.com",
+                    443,
+                    2090,
+                    "123456789012"
+                )
+            );
+
+            ProtocolLabConfigSafetyService
+                .ValidateLocalProxyIsolation("anytls", anyTls);
+            ProtocolLabConfigSafetyService
+                .ValidateLocalProxyIsolation("tuic", tuic);
+            ProtocolLabConfigSafetyService
+                .ValidateLocalProxyIsolation("snell", snell);
+
+            JsonObject anyTlsRoot =
+                JsonNode.Parse(anyTls)!.AsObject();
+
+            JsonObject tuicRoot =
+                JsonNode.Parse(tuic)!.AsObject();
+
+            AssertEqual(
+                false,
+                anyTlsRoot["outbounds"]?[0]?["tls"]?
+                    ["insecure"]?.GetValue<bool>()
+            );
+
+            AssertEqual(
+                false,
+                tuicRoot["outbounds"]?[0]?["tls"]?
+                    ["insecure"]?.GetValue<bool>()
+            );
+
+            AssertThrows<NotSupportedException>(() =>
+                ProtocolLabUiConfigService.CreateConfig(
+                    new ProtocolLabUiConnectionInput(
+                        "whitelist-mode",
+                        "edge.example.com",
+                        443,
+                        2091,
+                        "test-secret"
+                    )
+                )
             );
         }
 
